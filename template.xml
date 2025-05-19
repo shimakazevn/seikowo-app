@@ -12,10 +12,10 @@
 <include expiration='3d' path='*.png'/>
 
 <!-- LINK TAG -->
-<link href='http://www.blogger.com/openid-server.g' rel='openid.server'/>
-<!-- <link href='https://plus.google.com/xxxxxx/about' rel='publisher'/>
-<link href='https://plus.google.com/xxxxxx/about' rel='author'/>
-<link href='https://plus.google.com/xxxxxx' rel='me'/> -->
+<!-- <link href='http://www.blogger.com/openid-server.g' rel='openid.server'/> -->
+<link href='https://plus.google.com/shimakazevn/about' rel='publisher'/>
+<link href='https://plus.google.com/shimakazevn/about' rel='author'/>
+<link href='https://plus.google.com/shimakazevn' rel='me'/>
 <link expr:href='data:blog.url' hreflang='x-default' rel='alternate'/>
 <link expr:href='data:blog.blogspotFaviconUrl' rel='icon' type='image/x-icon'/>
 <link expr:href='data:blog.homepageUrl + "feeds/posts/default"' expr:title='data:blog.title + "- Atom"' rel='alternate' type='application/atom+xml'/>
@@ -36,7 +36,6 @@
 <link href='//github.com' rel='dns-prefetch'/>
 <link href='//cdn.rawgit.com' rel='dns-prefetch'/>
 <link href='//fontawesome.com' rel='dns-prefetch'/>
-<link href='//addthis.com' rel='dns-prefetch'/>
 
 
 
@@ -44,7 +43,7 @@
 <meta content='XXXXX' name='google-site-verification'/>
 <meta content='XXXXX' name='msvalidate.01'/>
 <meta content='XXXXX' name='yandex-verification'/>
-<meta content='Indonesia' name='geo.placename'/>
+<meta content='Vietnam' name='geo.placename'/>
 <meta content='Code Pelajar' name='Author'/>
 <meta content='general' name='rating'/>
 <meta content='id' name='geo.country'/>
@@ -1034,7 +1033,6 @@ window.__CODEPELAJAR_CONFIG__ = {
   blogId: "<data:blog.blogId />",
   disqus: "codepelajar",
   defaultImage: "https://1.bp.blogspot.com/-QYP55lDT3y8/XdEL28HRsfI/AAAAAAAACqw/My15c96Og8022Jc6HVfPFf1gBku8PmA_wCLcBGAsYHQ/s1600/no-image-codepelajar.png",
-  addThisId: "5dd79989c6588238",
   cseUrl: "https://cse.google.com/cse.js?cx=005178091281942032751:rimwwhz9ofx"
 };
 </script>
@@ -1042,8 +1040,7 @@ window.__CODEPELAJAR_CONFIG__ = {
 !function (c) { function e(e) { for (var r, t, n = e[0], o = e[1], u = e[2], a = 0, l = []; a < n.length; a++)t = n[a], Object.prototype.hasOwnProperty.call(f, t) && f[t] && l.push(f[t][0]), f[t] = 0; for (r in o) Object.prototype.hasOwnProperty.call(o, r) && (c[r] = o[r]); for (s && s(e); l.length;)l.shift()(); return i.push.apply(i, u || []), p() } function p() { for (var e, r = 0; r < i.length; r++) { for (var t = i[r], n = !0, o = 1; o < t.length; o++) { var u = t[o]; 0 !== f[u] && (n = !1) } n && (i.splice(r--, 1), e = a(a.s = t[0])) } return e } var t = {}, f = { 1: 0 }, i = []; function a(e) { if (t[e]) return t[e].exports; var r = t[e] = { i: e, l: !1, exports: {} }; return c[e].call(r.exports, r, r.exports, a), r.l = !0, r.exports } a.m = c, a.c = t, a.d = function (e, r, t) { a.o(e, r) || Object.defineProperty(e, r, { enumerable: !0, get: t }) }, a.r = function (e) { "undefined" != typeof Symbol && Symbol.toStringTag && Object.defineProperty(e, Symbol.toStringTag, { value: "Module" }), Object.defineProperty(e, "__esModule", { value: !0 }) }, a.t = function (r, e) { if (1 & e && (r = a(r)), 8 & e) return r; if (4 & e && "object" == typeof r && r && r.__esModule) return r; var t = Object.create(null); if (a.r(t), Object.defineProperty(t, "default", { enumerable: !0, value: r }), 2 & e && "string" != typeof r) for (var n in r) a.d(t, n, function (e) { return r[e] }.bind(null, n)); return t }, a.n = function (e) { var r = e && e.__esModule ? function () { return e.default } : function () { return e }; return a.d(r, "a", r), r }, a.o = function (e, r) { return Object.prototype.hasOwnProperty.call(e, r) }, a.p = "/"; var r = this.webpackJsonpcodepelajarreact = this.webpackJsonpcodepelajarreact || [], n = r.push.bind(r); r.push = e, r = r.slice(); for (var o = 0; o < r.length; o++)e(r[o]); var s = n; p() }([])
 //]]>//</script>
 <script src='https://raw.githack.com/itokun99/codepelajar-react/master/release/build/static/js/2.chunk.js' type='text/javascript'/>
-<script src='https://raw.githack.com/itokun99/codepelajar-react/master/release/build/static/js/main.chunk.js' type='text/javascript'/>
-<div style='position: fixed; top: 50px; right: 0px; z-index: 99999;'><a href='https://www.iwa.id/2019' style='display:block; width: 68px; height: 100px;' target='_blank'><img src='https://www.iwa.id/ribbon/iwa-nominee-ribbon.png'/></a></div>
+<script src='https://raw.githack.com/itokun99/codepelajar-react/master/release/build/static/js/main.chunk.js' type='text/javascript'/>>
 
 <script data-ad-client="ca-pub-1718279142884347" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
 &lt;/body&gt;

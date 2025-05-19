@@ -1,5 +1,5 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
+import ReactDOM from 'react-dom/client'
 import { IconContext } from 'libraries';
 import {
   FeaturePost,
@@ -27,13 +27,14 @@ registerComponent.forEach(app => {
   const Component = app.component;
   const el = app.element;
   if (el) {
-    ReactDOM.render(
+    const root = ReactDOM.createRoot(el);
+    root.render(
       <IconContext.Provider value={{ color: '#ddd', className: 'a-icon' }}>
         <Component />
-      </IconContext.Provider>,
-      el
+      </IconContext.Provider>
     );
   }
+  
 });
 
 // If you want your app to work offline and load faster, you can change

@@ -1,4 +1,4 @@
-@import './global/variable.scss';
-@import './global/reset.scss';
-@import './components/index';
-@import './containers/index';
+@use './global/variable' as *;
+@use './global/reset' as *;
+@use './components/index' as components;
+@use './containers/index' as containers;

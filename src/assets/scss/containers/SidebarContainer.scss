@@ -1,3 +1,4 @@
+@use "../global/variable" as *;
 .sidebar.main-content {
   &__left {
     padding-top: calc(#{$gutter-m} + 60px);

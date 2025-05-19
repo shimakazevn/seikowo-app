@@ -3,7 +3,6 @@ import { View, Text, Anchor, Skeleton, Icon } from 'components/atoms';
 import {
   PostAuthorMeta,
   DisqusComment,
-  AddThis,
   BreadCrumb
 } from 'components/molecules';
 import { parseJSON, createAuthor, createSearchUrl } from 'utils';
@@ -57,7 +56,7 @@ class SinglePostBlock extends React.Component {
           isLoading: false
         },
         () => {
-          if (window.confirm('Koneksi bermasalah! Silahkan refresh ulang.'))
+          if (window.confirm('Connection problem! Please refresh again.'))
             return window.location.reload();
         }
       );
@@ -177,7 +176,6 @@ class SinglePostBlock extends React.Component {
         <View className="o-single-post-block__footer">
           {data && data.url ? <DisqusComment currentUrl={data.url} /> : null}
         </View>
-        <AddThis id={config.addThis.id} />
       </View>
     );
   }
