@@ -4,16 +4,16 @@ const blogConfig = window.__CODEPELAJAR_CONFIG__;
 const development = {
   url: {
     api: 'https://www.googleapis.com/blogger/v3',
-    feed: 'https://nextcodepelajar.blogspot.com/feeds',
-    asset: 'https://nextcodepelajar.blogspot.com',
-    origin: 'https://nextcodepelajar.blogspot.com'
+    feed: 'https://seikowo-app.blogspot.com//feeds',
+    asset: 'https://seikowo-app.blogspot.com/',
+    origin: 'https://seikowo-app.blogspot.com/'
   },
   google: {
-    apiKey: 'AIzaSyB2MpzH-Gq6fnWuUnoI2PH2sPMTkGIQ9b0',
+    apiKey: 'AIzaSyAygK6w9GS-UuEqzlfYr77YSAv35Mrmfvc',
     blogId
   },
   disqus: {
-    shortName: 'codepelajar'
+    shortName: 'seikowo-app'
   },
   cse: {
     url:
@@ -30,7 +30,7 @@ const production = {
     origin: window.location.origin
   },
   google: {
-    apiKey: 'AIzaSyB2MpzH-Gq6fnWuUnoI2PH2sPMTkGIQ9b0',
+    apiKey: 'AIzaSyAygK6w9GS-UuEqzlfYr77YSAv35Mrmfvc',
     blogId: blogConfig.blogId || blogId
   },
   disqus: {

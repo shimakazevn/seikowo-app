@@ -17,7 +17,8 @@ class SinglePostBlock extends React.Component {
       data: null,
       isLoading: false,
       times: 0,
-      contentLoaded: false
+      contentLoaded: false,
+      hasError: false
     };
   }
 
@@ -34,32 +35,17 @@ class SinglePostBlock extends React.Component {
 
   init = async () => {
     try {
-      await this.setState({ isLoading: true });
+      await this.setState({ isLoading: true, hasError: false });
       const postJSON = parseJSON(window.__POSTS__);
       const { id } = postJSON;
       const data = await callPostById(id);
-      setTimeout(() => {
-        this.setState({ data, isLoading: false, contentLoaded: true });
-      }, 2000);
+      this.setState({ data, isLoading: false, contentLoaded: true });
     } catch (err) {
       const { times } = this.state;
       if (times < 2) {
-        return this.setState(
-          {
-            times: times + 1
-          },
-          () => this.init()
-        );
+        return this.setState({ times: times + 1 }, () => this.init());
       }
-      return this.setState(
-        {
-          isLoading: false
-        },
-        () => {
-          if (window.confirm('Connection problem! Please refresh again.'))
-            return window.location.reload();
-        }
-      );
+      return this.setState({ isLoading: false, hasError: true });
     }
   };
 
@@ -85,7 +71,6 @@ class SinglePostBlock extends React.Component {
       for (let i = 0; i < preCount; i += 1) {
         preTag[i].classList.add('prettyprint');
       }
-
       await this.loadPretify();
     }
   };
@@ -94,38 +79,15 @@ class SinglePostBlock extends React.Component {
     <React.Fragment>
       <Skeleton style={{ width: '80%', height: 40, marginBottom: 24 }} />
       <View className="d-flex">
-        <Skeleton
-          style={{
-            width: '20%',
-            height: 20,
-            marginBottom: 24,
-            marginRight: 24
-          }}
-        />
+        <Skeleton style={{ width: '20%', height: 20, marginBottom: 24, marginRight: 24 }} />
         <Skeleton style={{ width: '30%', height: 20, marginBottom: 40 }} />
       </View>
       <Skeleton style={{ width: '100%', height: 1, marginBottom: 40 }} />
-      <View
-        className="d-flex"
-        style={{ alignItems: 'center', marginBottom: 50 }}
-      >
-        <Skeleton
-          style={{
-            width: 50,
-            height: 50,
-            marginRight: 24,
-            borderRadius: 50
-          }}
-        />
+      <View className="d-flex" style={{ alignItems: 'center', marginBottom: 50 }}>
+        <Skeleton style={{ width: 50, height: 50, marginRight: 24, borderRadius: 50 }} />
         <Skeleton style={{ width: 200, height: 20 }} />
       </View>
-      <Skeleton
-        style={{
-          width: '100%',
-          paddingBottom: '40%',
-          marginBottom: 40
-        }}
-      />
+      <Skeleton style={{ width: '100%', paddingBottom: '40%', marginBottom: 40 }} />
       {[1, 2].map(val => (
         <React.Fragment key={val}>
           <View style={{ marginBottom: 54 }}>
@@ -139,12 +101,19 @@ class SinglePostBlock extends React.Component {
     </React.Fragment>
   );
 
+  renderError = () => (
+    <View className="error-message" style={{ padding: 20, color: 'red' }}>
+      <Text>❗ Kết nối gặp sự cố. <Anchor onClick={() => window.location.reload()}>Thử lại</Anchor></Text>
+    </View>
+  );
+
   render() {
-    const { isLoading, data } = this.state;
+    const { isLoading, data, hasError } = this.state;
     return (
       <View className="o-single-post-block__wrapper">
         <View className="o-single-post-block__header">
           {isLoading && this.renderSkeleton()}
+          {hasError && this.renderError()}
           {data && (
             <BreadCrumb
               title={data.title}
@@ -152,32 +121,33 @@ class SinglePostBlock extends React.Component {
               url={data.url}
             />
           )}
-          {data && data.title ? (
+          {data && data.title && (
             <Text tag="h1" className="o-single-post-block__title">
               {data.title}
             </Text>
-          ) : null}
+          )}
           <View className="o-single-post-block__meta">
-            {data && data.published ? (
+            {data && data.published && (
               <Text className="o-single-post-block__datetime">
                 Diposting pada: {moment(data.published).format('LLLL')}
               </Text>
-            ) : null}
-            {data && data.author ? (
+            )}
+            {data && data.author && (
               <PostAuthorMeta imageSize={50} data={createAuthor(data.author)} />
-            ) : null}
+            )}
           </View>
         </View>
         <View className="o-single-post-block__body">
-          {data && data.content ? (
+          {data && data.content && (
             <View dangerouslySetInnerHTML={{ __html: data.content }} />
-          ) : null}
+          )}
         </View>
         <View className="o-single-post-block__footer">
-          {data && data.url ? <DisqusComment currentUrl={data.url} /> : null}
+          {data && data.url && <DisqusComment currentUrl={data.url} />}
         </View>
       </View>
     );
   }
 }
+
 export default SinglePostBlock;
