@@ -2,3 +2,8 @@
 @use './global/reset' as *;
 @use './components/index' as components;
 @use './containers/index' as containers;
+// // Required Core Stylesheet
+// @import "node_modules/@glidejs/glide/src/assets/sass/glide.core";
+
+// // Optional Theme Stylesheet
+// @import "node_modules/@glidejs/glide/src/assets/sass/glide.theme";

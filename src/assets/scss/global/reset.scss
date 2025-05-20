@@ -1,16 +1,4 @@
 @use "variable" as *;
-body {
-  margin: 0;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  color: #24292e;
-  font-family: $global-font-2;
-  font-size: 16px;
-  line-height: 1.5;
-  -ms-text-size-adjust: 100%;
-  -webkit-text-size-adjust: 100%;
-  word-wrap: break-word
-}
 
 code {
   font-family: $mono-font;
@@ -76,7 +64,6 @@ audio,
 b,
 big,
 blockquote,
-body,
 canvas,
 caption,
 center,
@@ -154,15 +141,6 @@ video {
   vertical-align: baseline
 }
 
-body {
-  color: #24292e;
-  font-family: $global-font-2;
-  font-size: 16px;
-  line-height: 1.5;
-  -ms-text-size-adjust: 100%;
-  -webkit-text-size-adjust: 100%;
-  word-wrap: break-word
-}
 
 * {
   box-sizing: border-box
@@ -412,12 +390,6 @@ hr:after {
   clear: both
 }
 
-body {
-  background-color: #fff;
-  min-height: 100vh;
-  text-rendering: optimizeLegibility
-}
-
 
 /*! Color themes for Google Code Prettify | MIT License | github.com/jmblog/color-themes-for-google-code-prettify */
 .prettyprint {
@@ -509,15 +481,6 @@ li.L9 {
   }
 }
 
-@media only screen and (min-width: 736px) {
-  body {
-    display: -webkit-box;
-    display: flex;
-    -webkit-box-orient: vertical;
-    -webkit-box-direction: normal;
-    flex-direction: column
-  }
-}
 
 article:after,
 article:before {
@@ -548,7 +511,7 @@ article p img {
 /* ===  MAIN CSS === */
 
 .container {
-  max-width: 1200px;
+  max-width: 1440px;
   padding: 0 20px;
   margin: 0 auto;
 }

@@ -1,9 +1,11 @@
 import { React } from 'libraries';
 import _ from 'lodash';
-import { View, Skeleton, Button } from 'components/atoms';
+import { View,  Button } from 'components/atoms';
 import { PostCard } from 'components/molecules';
 import { callPosts } from 'services';
 import { createAuthor, getImage } from 'utils';
+import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
+import 'react-loading-skeleton/dist/skeleton.css'
 
 class FeatureBlock extends React.PureComponent {
   constructor(props) {
@@ -82,65 +84,37 @@ class FeatureBlock extends React.PureComponent {
   };
 
   renderSkeleton = () =>
-    [1, 2, 3].map(value => (
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(value => (
+    
       <View key={value} className="o-post-block__column">
-        <Skeleton
+        <SkeletonTheme baseColor="#dedede" highlightColor="#444">
+          <Skeleton
           style={{
-            paddingBottom: '64%',
+            paddingBottom: '140%',
             width: '100%',
-            marginBottom: 24
+            borderTopLeftRadius: 4,
+            borderTopRightRadius: 4,
+            borderBottomLeftRadius: 0,
+            borderBottomRightRadius: 0,
+            margin: 0,
+            height: 0,
           }}
-        />
-        <View
-          style={{
-            padding: 20
-          }}
-        >
+          />
+        </SkeletonTheme>
+        <SkeletonTheme baseColor="rgba(71, 71, 71, 0.1450980392)" highlightColor="#444">
           <Skeleton
             style={{
-              paddingBottom: 30,
+              // paddingBottom: '25%',
               width: '100%',
-              marginBottom: 15
+              borderTopLeftRadius: 0,
+              borderTopRightRadius: 0,
+              borderBottomLeftRadius: 4,
+              borderBottomRightRadius: 4,
+              margin: 0,
+              height: 70,
             }}
           />
-          <Skeleton
-            style={{
-              paddingBottom: 20,
-              width: '80%',
-              marginBottom: 10
-            }}
-          />
-          <Skeleton
-            style={{
-              paddingBottom: 20,
-              width: '50%',
-              marginBottom: 0
-            }}
-          />
-        </View>
-        <View
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            paddingLeft: 14,
-            paddingRight: 14
-          }}
-        >
-          <Skeleton
-            style={{
-              borderRadius: 30,
-              height: 30,
-              width: 30,
-              marginRight: 14
-            }}
-          />
-          <Skeleton
-            style={{
-              height: 15,
-              width: 100
-            }}
-          />
-        </View>
+        </SkeletonTheme>
       </View>
     ));
 
@@ -155,9 +129,10 @@ class FeatureBlock extends React.PureComponent {
                 <PostCard
                   url={post.url}
                   title={post.title}
-                  image={
-                    showImage ? getImage(_.get(post, 'images[0].url', '')) : ''
-                  }
+                  image={ 
+                          showImage ? getImage(_.get(post, 'images[0].url', '')) : 
+                          <Skeleton style={{ paddingBottom: '140%', width: '100%', marginBottom: 24, borderRadius: 4 }}/>
+                        }
                   author={createAuthor(post.author)}
                   label={post.labels}
                 />

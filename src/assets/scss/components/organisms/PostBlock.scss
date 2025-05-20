@@ -1,7 +1,7 @@
 @use "../../global/variable.scss" as *;
 .o-post-block {
   &__wrapper {
-    max-width: 900px;
+    // max-width: 900px;
     margin: 0 auto;
   }
 
@@ -18,7 +18,7 @@
   }
 
   &__column {
-    width: 33.333333%;
+    width: 20%;
     padding-right: $gutter-xs;
     padding-left: $gutter-xs;
     margin-bottom: $gutter-s;

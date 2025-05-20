@@ -13,7 +13,7 @@ const sendError = (error = {}, message = 'error response') =>
   new Error({ message, error });
 
 const postConfig = (option = {}) => ({
-  maxResults: 6,
+  maxResults: 10,
   orderBy: 'published',
   key: config.google.apiKey,
   fetchBodies: true,
@@ -42,7 +42,7 @@ export const callFeaturedPost = (payload = {}) => {
     ...payload,
     params: {
       alt: 'json',
-      'max-results': 1,
+      'max-results': 5,
       ...featurePostConfig(payload.params || {})
     }
   };

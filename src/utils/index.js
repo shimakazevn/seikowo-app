@@ -3,7 +3,7 @@ import _ from 'lodash';
 import dummyFeaturePost from './featuredPost';
 
 // INITIALIZE BLOG ID
-export const blogId = `${_.get(window, '__BLOG_ID__', '5624631557745671504')}`;
+export const blogId = `${_.get(window, '__BLOG_ID__', '5603145815846388386')}`;
 
 // SHORTCUT DOCUMENT SCRIPT
 export const elementId = name => document.getElementById(name);
@@ -16,7 +16,7 @@ export const createSearchUrl = (value = '', customPath = null) =>
   `${customPath || '/search/label/'}${value}`;
 
 // RESIZE IMAGE FOR POST IMAGE
-export const resizeImage = (image, width = 400, height = 400, crop = true) => {
+export const resizeImage = (image, width = 226, height = 320, crop = true) => {
   const target = /\/s[0-9]+\-c/g;
   const result = `/w${width}-h${height}-${crop ? 'c' : ''}`;
   return image.replace(target, result);
@@ -37,7 +37,7 @@ export const getImage = (image = '') => {
   const defaultImage = _.get(
     window,
     '__CODEPELAJAR_CONFIG__.defaultImage',
-    'https://1.bp.blogspot.com/-QYP55lDT3y8/XdEL28HRsfI/AAAAAAAACqw/My15c96Og8022Jc6HVfPFf1gBku8PmA_wCLcBGAsYHQ/s1600/no-image-codepelajar.png'
+    'https://www.protean.co.jp/wp-content/themes/protean/images/no-image.gif'
   );
   if (image) return image;
   return defaultImage;
@@ -49,7 +49,7 @@ export const mapFeedToFeatureData = obj => {
 
   if (!data) return data;
   const image = _.get(data, 'media$thumbnail.url', '');
-  const resized = resizeImage(image, 640, 480);
+  const resized = resizeImage(image, 1200, 480);
   return {
     title: _.get(data, 'title.$t', ''),
     description: _.get(data, 'summary.$t', ''),

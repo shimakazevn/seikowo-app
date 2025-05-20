@@ -12,6 +12,8 @@ const PostCard = ({ title, author, image, url, label }) => (
           source={image}
           backgroundImage
           resizeMode="cover"
+          title={title}
+          alt={title}
         />
       </Anchor>
       <View className="m-post-card__label-holder">
@@ -20,14 +22,14 @@ const PostCard = ({ title, author, image, url, label }) => (
     </View>
     <View className="m-post-card__body">
       <Anchor href={url} title={title}>
-        <Text className="m-post-card__title" tag="h2">
+        <Text className="m-post-card__title" tag="h4">
           {title}
         </Text>
       </Anchor>
     </View>
     <View className="m-post-card__footer">
       <View className="m-post-card__meta">
-        <PostAuthorMeta showImage={image !== ''} data={author} />
+        {/* <PostAuthorMeta showImage={image !== ''} data={author} /> */}
       </View>
     </View>
   </View>

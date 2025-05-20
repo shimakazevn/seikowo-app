@@ -8,7 +8,7 @@ const dummy = {
   description:
     'Selamat datang di postingan dokumentasi template yang saya buat dan bernama BLACK CLOVER. Berikut dokumentasinya:Cara Setting TemplatePemasangan- Buka Blogger.com- Pergi ke menu Tema- Lihat kiri atas ada tombol backup/pulihkan dan klik- Akan ada Modal popup, tekan tombol "choose file"- Pilih template ini- DoneKonfigurasi kelengkapan templateKonfigurasi sosial dan verifikasiCari SOSIAL AND ',
   image:
-    'https://2.bp.blogspot.com/-_EVYfMGHtDU/W2Vd0vSfVRI/AAAAAAAABOk/NuOGcRH2eI4o5R9fNUN8dmXjrmcYwjSWQCPcBGAYYCw/w400-h400-c/2b31cd88f286a2c063c58aa2176fdc30.png',
+    'https://2.bp.blogspot.com/-_EVYfMGHtDU/W2Vd0vSfVRI/AAAAAAAABOk/NuOGcRH2eI4o5R9fNUN8dmXjrmcYwjSWQCPcBGAYYCw/s1200/2b31cd88f286a2c063c58aa2176fdc30.png',
   url:
     'https://nextcodepelajar.blogspot.com/2018/08/dokumentasi-simpel-template-black-clover.html'
 };
@@ -136,7 +136,7 @@ class FeatureBlock extends React.PureComponent {
             {isLoaded && (
               <Image
                 className="o-feature-block__image"
-                source={showImage ? getImage(image) : ''}
+                source={showImage ? getImage(image) : 'loading'}
                 backgroundImage
                 resizeMode="cover"
                 title={title}

@@ -3,9 +3,11 @@
   &__wrapper {
     position: relative;
     transition: all 0.5s ease;
-    background-color: $light-100;
+    background-color:#47474725;
     overflow: hidden;
-
+    border-radius: 4px;
+    box-shadow: 0 2px 50px 0.5px $dark-50;
+    border: 1px solid #2d2d2d;
 
     @media (min-width: $tablet) {
       &:hover {
@@ -22,9 +24,7 @@
 
   &__image {
     width: 100%;
-    padding-bottom: 64%;
-    background-position: center;
-    background-repeat: no-repeat;
+    padding-bottom: 140%;
     background-color: $bg-default;
   }
 
@@ -38,12 +38,21 @@
 
   &__body {
     padding: $gutter-s;
+    height: 70px;
   }
 
   &__title {
     margin: 0;
-    font-size: $font-m;
-    color: $dark-100;
+    font-family: "Poppins", sans-serif;
+    font-size: $font-s;
+    color: $light-100;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+     word-wrap: normal;
+    -webkit-line-clamp: 2;
+    line-height: 1.2;
   }
 
   &__footer {
