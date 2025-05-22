@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Flex, 
   Box, 
@@ -18,18 +18,16 @@ const Pagination = ({ currentPage, totalPages, onPageChange, mutedTextColor }) =
 
   return (
     <Flex 
-      justify="center" 
-      mt={6} 
-      w="full"
+      justify={{ base: "center", md: "flex-end" }}
+      w={{ base: "100%", md: "auto" }}
       px={{ base: 2, md: 0 }}
+      mb={4}
     >
       <Box
         overflowX="auto"
         py={2}
         px={4}
         borderRadius="lg"
-        bg={paginationBg}
-        shadow="sm"
         maxW="100%"
       >
         <HStack spacing={{ base: 1, md: 2 }}>

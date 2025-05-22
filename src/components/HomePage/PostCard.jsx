@@ -2,42 +2,68 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Box, Text, Image, Skeleton, Badge } from '@chakra-ui/react';
 import { motion } from 'framer-motion';
-import { extractImage, optimizeThumbnail, getSlugFromUrl } from '../../utils/blogUtils';
+import { extractImage, optimizeThumbnail, getSlugFromUrl, getThumbnailBySlug } from '../../utils/blogUtils';
 
 const MotionBox = motion(Box);
 
-const PostCard = ({ post, index, cardBg, textColor, mutedTextColor }) => {
-  const thumbnail = extractImage(post.content);
-  const date = new Date(post.updated);
+const PostCard = ({ post, index, cardBg, textColor, mutedTextColor, extraInfo, actionButton }) => {
+  const animationVariants = {
+    initial: { 
+      opacity: 0,
+      scale: 0.97,
+      filter: 'blur(2px)'
+    },
+    animate: { 
+      opacity: 1,
+      scale: 1,
+      filter: 'blur(0px)',
+      transition: {
+        delay: index * 0.03,
+        duration: 0.15,
+        ease: 'easeOut'
+      }
+    },
+    exit: { 
+      opacity: 0,
+      scale: 0.97,
+      filter: 'blur(2px)'
+    }
+  };
+
+  // Get cached posts from localStorage
+  const cachedPosts = JSON.parse(localStorage.getItem('cachedPosts') || '[]');
+  const slug = post.slug || getSlugFromUrl(post.url);
+  
+  // Use getThumbnailBySlug with fallback to existing logic
+  const thumbnail = getThumbnailBySlug(cachedPosts, slug) || 
+                   (post.thumbnail || (post.content ? extractImage(post.content) : null));
+  const date = post.updated ? new Date(post.updated) : null;
 
   return (
     <MotionBox
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ 
-        duration: 0.3, 
-        delay: index * 0.1,
-        ease: 'easeOut'
-      }}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      variants={animationVariants}
       borderWidth="1px"
       borderRadius="lg"
       overflow="hidden"
       boxShadow="sm"
       bg={cardBg}
-      _hover={{ 
-        transform: 'translateY(-4px)', 
+      h="100%"
+      w="100%"
+      _hover={{
+        transform: 'translateY(-4px)',
         boxShadow: 'md',
         '& img': {
           transform: 'scale(1.05)',
         }
       }}
-      h="100%"
-      w="100%"
       style={{
         transition: 'all 0.3s ease'
       }}
     >
-      <Link to={`/${getSlugFromUrl(post.url)}`} style={{ display: 'block' }}>
+      <Link to={`/${slug}`} style={{ display: 'block' }}>
         <Box 
           position="relative" 
           paddingBottom="150%" 
@@ -51,7 +77,7 @@ const PostCard = ({ post, index, cardBg, textColor, mutedTextColor }) => {
             bottom={0}
           >
             <Image
-              src={optimizeThumbnail(thumbnail, 600)}
+              src={thumbnail ? optimizeThumbnail(thumbnail, 600) : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjkwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGFsaWdubWVudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZmlsbD0iIzY2NiI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+'}
               alt={post.title}
               width="100%"
               height="100%"
@@ -110,22 +136,38 @@ const PostCard = ({ post, index, cardBg, textColor, mutedTextColor }) => {
             fontWeight="medium"
             noOfLines={2}
             color={textColor}
-            mb={8}
+            mb={extraInfo ? 2 : 8}
             letterSpacing="tight"
           >
             {post.title}
           </Text>
-          <Text 
-            fontSize="xs" 
-            color={mutedTextColor}
-            position="absolute"
-            bottom={{ base: 2, sm: 3 }}
-            left={{ base: 2, sm: 3 }}
-          >
-            {date.toLocaleDateString('vi-VN')}
-          </Text>
+          {extraInfo && (
+            <Text 
+              fontSize="xs" 
+              color={mutedTextColor}
+              mb={actionButton ? 2 : 8}
+            >
+              {extraInfo}
+            </Text>
+          )}
+          {!extraInfo && date && (
+            <Text 
+              fontSize="xs" 
+              color={mutedTextColor}
+              position="absolute"
+              bottom={{ base: 2, sm: 3 }}
+              left={{ base: 2, sm: 3 }}
+            >
+              {date.toLocaleDateString('vi-VN')}
+            </Text>
+          )}
         </Box>
       </Link>
+      {actionButton && (
+        <Box px={{ base: 2, sm: 3 }} pb={{ base: 2, sm: 3 }}>
+          {actionButton}
+        </Box>
+      )}
     </MotionBox>
   );
 };

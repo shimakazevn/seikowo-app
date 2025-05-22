@@ -21,8 +21,10 @@ import {
   HStack,
   useColorModeValue,
   AspectRatio,
+  useToast,
 } from '@chakra-ui/react';
-import { ArrowBackIcon } from '@chakra-ui/icons';
+import { ArrowBackIcon, StarIcon } from '@chakra-ui/icons';
+import { getSlugFromUrl } from '../utils/blogUtils';
 
 const CACHE_DURATION = 3600000; // 1 hour in milliseconds
 const CACHE_KEY = "cachedPosts";
@@ -58,6 +60,8 @@ const PostContent = ({ post }) => {
   const contentRef = useRef(null);
   const [mangaImages, setMangaImages] = useState([]);
   const [isMangaPost, setIsMangaPost] = useState(false);
+  const toast = useToast();
+  const [followed, setFollowed] = useState(isFollowed(post));
 
   useEffect(() => {
     if (contentRef.current) {
@@ -101,6 +105,8 @@ const PostContent = ({ post }) => {
       }
     }
   }, [post.content, post.labels]);
+
+  useEffect(() => { setFollowed(isFollowed(post)); }, [post]);
 
   // Function to process HTML content and replace img tags with LazyLoadImage
   const processContent = (content) => {
@@ -168,10 +174,29 @@ const PostContent = ({ post }) => {
             day: 'numeric'
           })}
         </Text>
+        <Button
+          size="sm"
+          colorScheme={followed ? 'red' : 'blue'}
+          variant={followed ? 'outline' : 'solid'}
+          onClick={() => {
+            if (followed) {
+              removeFollow(post);
+              setFollowed(false);
+              toast({ title: 'Đã bỏ follow', status: 'info' });
+            } else {
+              saveFollow(post);
+              setFollowed(true);
+              toast({ title: 'Đã follow bài viết', status: 'success' });
+            }
+          }}
+          leftIcon={<StarIcon />}
+        >
+          {followed ? 'Bỏ follow' : 'Follow'}
+        </Button>
       </HStack>
 
       {isMangaPost ? (
-        <MangaReader images={mangaImages} />
+        <MangaReader images={mangaImages} postId={post.id} postTitle={post.title} postSlug={getSlugFromUrl(post.url)} />
       ) : (
         <Box
           ref={contentRef}
@@ -328,6 +353,80 @@ const NotFoundAlert = () => (
   </Alert>
 );
 
+function saveReadHistory(post) {
+  if (!post) return;
+  const userId = localStorage.getItem('google_user_id') || 'guest';
+  const key = `history_read_posts_${userId}`;
+  const slug = getSlugFromUrl(post.url);
+  const entry = {
+    id: post.id,
+    title: post.title,
+    slug,
+    readAt: Date.now(),
+  };
+
+  let arr = [];
+  try {
+    arr = JSON.parse(localStorage.getItem(key) || '[]');
+  } catch (err) {
+    // Ignore error and start with empty array
+  }
+
+  arr = arr.filter(item => item.id !== post.id);
+  arr.unshift(entry);
+  if (arr.length > 100) arr = arr.slice(0, 100);
+
+  try {
+    localStorage.setItem(key, JSON.stringify(arr));
+  } catch (err) {
+    // Ignore error if storage is full
+  }
+}
+
+function saveFollow(post) {
+  if (!post) return;
+  const userId = localStorage.getItem('google_user_id') || 'guest';
+  const key = `history_follow_posts_${userId}`;
+  const slug = getSlugFromUrl(post.url);
+  const entry = {
+    id: post.id,
+    title: post.title,
+    slug,
+    followAt: Date.now(),
+  };
+  let arr = [];
+  try {
+    arr = JSON.parse(localStorage.getItem(key) || '[]');
+  } catch {}
+  arr = arr.filter(item => item.id !== post.id);
+  arr.unshift(entry);
+  if (arr.length > 100) arr = arr.slice(0, 100);
+  localStorage.setItem(key, JSON.stringify(arr));
+}
+
+function removeFollow(post) {
+  if (!post) return;
+  const userId = localStorage.getItem('google_user_id') || 'guest';
+  const key = `history_follow_posts_${userId}`;
+  let arr = [];
+  try {
+    arr = JSON.parse(localStorage.getItem(key) || '[]');
+  } catch {}
+  arr = arr.filter(item => item.id !== post.id);
+  localStorage.setItem(key, JSON.stringify(arr));
+}
+
+function isFollowed(post) {
+  if (!post) return false;
+  const userId = localStorage.getItem('google_user_id') || 'guest';
+  const key = `history_follow_posts_${userId}`;
+  let arr = [];
+  try {
+    arr = JSON.parse(localStorage.getItem(key) || '[]');
+  } catch {}
+  return arr.some(item => item.id === post.id);
+}
+
 function PostPage() {
   const { '*': fullPath } = useParams();
   const [post, setPost] = useState(null);
@@ -409,6 +508,12 @@ function PostPage() {
     fetchPosts();
   }, [fullPath]);
 
+  useEffect(() => {
+    if (post) {
+      saveReadHistory(post);
+    }
+  }, [post]);
+
   // Update document title when post is loaded
   useEffect(() => {
     if (post?.title) {
@@ -421,6 +526,9 @@ function PostPage() {
       document.title = blogConfig.title || 'Blog';
     };
   }, [post]);
+
+  // Lấy userId từ localStorage (hoặc context), nếu chưa có thì 'guest'
+  const userId = localStorage.getItem('google_user_id') || 'guest';
 
   return (
     <PageTransition>

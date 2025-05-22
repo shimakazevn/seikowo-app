@@ -23,6 +23,10 @@ export const mainMenuItems = [
   {
     to: '/search',
     label: 'Tìm kiếm'
+  },
+  {
+    to: '/history',
+    label: 'Lịch sử'
   }
 ];
 

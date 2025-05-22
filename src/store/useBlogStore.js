@@ -11,6 +11,18 @@ const useBlogStore = create((set, get) => ({
   loading: false,
   error: null,
   lastRefreshTime: 0,
+  selectedTag: null,
+
+  setSelectedTag: (tag) => set({ selectedTag: tag }),
+
+  getFilteredPosts: () => {
+    const { posts, selectedTag } = get();
+    if (!selectedTag) return posts;
+    return posts.filter(post => 
+      post.labels && post.labels.includes(selectedTag)
+    );
+  },
+
   fetchPosts: async (forceRefresh = false) => {
     set({ loading: true, error: null });
 

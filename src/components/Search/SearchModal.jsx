@@ -38,6 +38,7 @@ import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
 import useSearchStore from '../../store/useSearchStore';
 import { Link } from 'react-router-dom';
+import { getSlugFromUrl } from '../../utils/blogUtils';
 
 // Constants
 const SEARCH_HISTORY_KEY = 'search_history';
@@ -350,7 +351,7 @@ const ResultItem = React.memo(({ result, onClose, handleTagClick, hoverBg, image
       }}
       transition="all 0.2s ease-in-out"
       as={Link}
-      to={`/${result.url.split('/').pop()}`}
+      to={`/${getSlugFromUrl(result.url)}`}
       onClick={onClose}
       position="relative"
       display="block"

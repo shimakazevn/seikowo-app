@@ -1,4 +1,5 @@
 import { lazy } from 'react';
+import UserHistoryPage from './pages/HistoryPage';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
 const PostPage = lazy(() => import('./pages/PostPage'));
@@ -37,4 +38,15 @@ export const routes = [
     path: '/search',
     element: <SearchPage />,
   },
-]; 
+  {
+    path: '/u/:userId',
+    element: <UserHistoryPage />,
+  },
+];
+
+const token = localStorage.getItem('furina_water');
+if (token) setAccessToken(token);
+
+localStorage.setItem('furina_water', token);
+
+localStorage.removeItem('furina_water'); 

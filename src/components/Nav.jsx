@@ -1,5 +1,5 @@
-import React, { memo, useCallback } from 'react';
-import { Link as RouterLink, useLocation } from 'react-router-dom';
+import React, { memo, useCallback, useEffect, useState } from 'react';
+import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Flex,
@@ -30,6 +30,7 @@ import {
   PopoverTrigger,
   PopoverContent,
   useBreakpointValue,
+  useToast,
 } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -43,6 +44,18 @@ import {
 } from '@chakra-ui/icons';
 import SearchModal from './Search/SearchModal';
 import useSearchStore from '../store/useSearchStore';
+import NavLogo from './Nav/NavLogo';
+import NavActions from './Nav/NavActions';
+import NavMenuDesktop from './Nav/NavMenuDesktop';
+import NavMenuMobile from './Nav/NavMenuMobile';
+import { backupUserData } from './GoogleDriveLogin';
+import { 
+  syncGuestData, 
+  getHistoryData,
+  READ_KEY,
+  FOLLOW_KEY,
+  MANGA_KEY
+} from '../utils/historyUtils';
 
 const MotionIconButton = motion(IconButton);
 
@@ -269,30 +282,20 @@ const MobileNav = memo(({ menuItems, isOpen }) => {
 MobileNav.displayName = 'MobileNav';
 
 const Nav = () => {
-  const { colorMode, toggleColorMode } = useColorMode();
   const { isOpen, onToggle } = useDisclosure();
-  const location = useLocation();
+  const { colorMode, toggleColorMode } = useColorMode();
   const { openSearch } = useSearchStore();
-  
-  const bgColor = useColorModeValue('rgba(255, 255, 255, 0.8)', 'rgba(26, 32, 44, 0.8)');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [userId, setUserId] = useState('guest');
+  const [accessToken, setAccessToken] = useState(null);
+  const toast = useToast();
+
+  const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
-  const textColor = useColorModeValue('gray.800', 'white');
-  const activeColor = useColorModeValue('blue.500', 'blue.300');
   const hoverBg = useColorModeValue('gray.100', 'gray.700');
-
-  const menuItems = React.useMemo(() => [
-    { name: 'Trang chủ', path: '/' },
-    { name: 'Categories', path: '/categories' },
-    { name: 'About', path: '/about' },
-    { name: 'Contact', path: '/contact' },
-  ], []);
-
-  const isActive = useCallback((path) => {
-    if (path === '/') {
-      return location.pathname === '/';
-    }
-    return location.pathname.startsWith(path);
-  }, [location.pathname]);
+  const activeColor = useColorModeValue('blue.600', 'blue.200');
+  const textColor = useColorModeValue('gray.600', 'gray.200');
 
   const handleToggleColorMode = useCallback(() => {
     toggleColorMode();
@@ -301,6 +304,193 @@ const Nav = () => {
   const handleOpenSearch = useCallback(() => {
     openSearch();
   }, [openSearch]);
+
+  // Load user data on mount and token change
+  useEffect(() => {
+    const loadUserData = () => {
+      const token = localStorage.getItem('furina_water');
+      const id = localStorage.getItem('google_user_id') || 'guest';
+      
+      if (token) {
+        setAccessToken(token);
+        setUserId(id);
+        
+        // If we're on a user's history page but not logged in as that user,
+        // redirect to the current user's history page
+        const urlUserId = location.pathname.match(/^\/u\/([^/]+)/)?.[1];
+        if (urlUserId && urlUserId !== id && urlUserId !== 'guest') {
+          navigate(`/u/${id}`);
+        }
+      } else {
+        // If no token, ensure we're in guest mode
+        setAccessToken(null);
+        setUserId('guest');
+        localStorage.removeItem('google_user_id');
+        
+        // If we're on a user's history page but not in guest mode,
+        // redirect to guest history
+        const urlUserId = location.pathname.match(/^\/u\/([^/]+)/)?.[1];
+        if (urlUserId && urlUserId !== 'guest') {
+          navigate('/u/guest');
+        }
+      }
+    };
+
+    loadUserData();
+    
+    // Add storage event listener to sync across tabs
+    const handleStorageChange = (e) => {
+      if (e.key === 'furina_water' || e.key === 'google_user_id') {
+        loadUserData();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [location.pathname, navigate]);
+
+  const handleLogin = useCallback(async (token) => {
+    try {
+      const id = localStorage.getItem('google_user_id');
+      
+      if (!id) {
+        throw new Error('Không thể lấy ID người dùng');
+      }
+
+      // Sync guest data when logging in
+      const syncResult = await syncGuestData(id);
+      
+      // Only proceed with login if sync was successful
+      if (syncResult.synced) {
+        // Show success toast with sync results
+        if (syncResult.changes.reads > 0 || syncResult.changes.follows > 0 || syncResult.changes.bookmarks > 0) {
+          const details = [];
+          
+          if (syncResult.changes.reads > 0) {
+            details.push(`${syncResult.changes.reads} bài đã đọc`);
+          }
+          
+          if (syncResult.changes.follows > 0) {
+            details.push(`${syncResult.changes.follows} bài theo dõi`);
+          }
+          
+          if (syncResult.changes.bookmarks > 0) {
+            details.push(`${syncResult.changes.bookmarks} bookmark`);
+          }
+
+          toast({
+            title: 'Đã đồng bộ dữ liệu từ chế độ khách',
+            description: details.join('\n'),
+            status: 'success',
+            duration: 5000,
+            isClosable: true,
+          });
+        }
+        
+        // Backup synced data to Drive
+        try {
+          const currentData = {
+            readPosts: getHistoryData(READ_KEY, id),
+            followPosts: getHistoryData(FOLLOW_KEY, id),
+            mangaBookmarks: getHistoryData(MANGA_KEY, id),
+            timestamp: Date.now()
+          };
+          
+          await backupUserData(token, id, currentData);
+          
+          // Only update state and localStorage after successful backup
+          setAccessToken(token);
+          setUserId(id);
+          localStorage.setItem('furina_water', token);
+          
+          // Navigate to user's history page
+          navigate(`/u/${id}`);
+          
+          toast({
+            title: 'Đã sao lưu dữ liệu lên Drive',
+            status: 'success',
+            duration: 3000,
+            isClosable: true,
+          });
+        } catch (err) {
+          console.error('Error backing up after guest sync:', err);
+          toast({
+            title: 'Lỗi sao lưu',
+            description: 'Không thể sao lưu dữ liệu lên Drive. Vui lòng thử lại sau.',
+            status: 'warning',
+            duration: 5000,
+            isClosable: true,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error during login process:', err);
+      toast({
+        title: 'Lỗi đăng nhập',
+        description: err.message || 'Có lỗi xảy ra trong quá trình đăng nhập',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      
+      // Reset state on error
+      setAccessToken(null);
+      setUserId('guest');
+      localStorage.removeItem('furina_water');
+      localStorage.removeItem('google_user_id');
+    }
+  }, [toast, navigate]);
+
+  const handleLogout = useCallback(async () => {
+    // Backup data before logout if user is logged in
+    if (accessToken && userId !== 'guest') {
+      try {
+        const currentData = {
+          readPosts: getHistoryData(READ_KEY, userId),
+          followPosts: getHistoryData(FOLLOW_KEY, userId),
+          mangaBookmarks: getHistoryData(MANGA_KEY, userId),
+          timestamp: Date.now()
+        };
+        await backupUserData(accessToken, userId, currentData);
+      } catch (err) {
+        console.error('Auto backup on logout failed:', err);
+      }
+    }
+    
+    // Clear state
+    setAccessToken(null);
+    setUserId('guest');
+
+    // Clear all user data from localStorage
+    const keysToRemove = [
+      'furina_water',
+      'google_user_id',
+      `history_read_posts_${userId}`,
+      `history_follow_posts_${userId}`,
+      `history_manga_bookmarks_${userId}`,
+      `last_sync_time`
+    ];
+
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+
+    // Navigate to home page
+    navigate('/');
+  }, [accessToken, userId, navigate]);
+
+  const menuItems = React.useMemo(() => [
+    { name: 'Trang chủ', path: '/' },
+    { name: 'Categories', path: '/categories' },
+    { name: 'About', path: '/about' },
+    { name: 'Contact', path: '/contact' },
+    { name: 'Lịch sử', path: `/u/${userId}` },
+  ], [userId]);
+
+  const isActive = useCallback((path) => {
+    if (path === '/') {
+      return location.pathname === '/';
+    }
+    return location.pathname.startsWith(path);
+  }, [location.pathname]);
 
   return (
     <Box
@@ -312,7 +502,7 @@ const Nav = () => {
       borderStyle="solid"
       borderColor={borderColor}
       backdropFilter="blur(10px)"
-      WebkitBackdropFilter="blur(10px)"
+      webkitbackdropfilter="blur(10px)"
     >
       <Flex
         bg="transparent"
@@ -342,73 +532,33 @@ const Nav = () => {
           />
         </Flex>
 
-        <Flex 
-          flex={{ base: 1 }} 
-          justify={{ base: 'center', md: 'start' }}
-          align="center"
-          minW={0}
-          position="relative"
-        >
-          <Box
-            textAlign={useBreakpointValue({ base: 'center', md: 'left' })}
-            fontFamily={'heading'}
-            color={useColorModeValue('gray.800', 'white')}
-            fontWeight="bold"
-            fontSize={{ base: 'md', md: 'xl' }}
-            minW={0}
-            flex="0 1 auto"
-            whiteSpace="nowrap"
-            overflow="hidden"
-            textOverflow="ellipsis"
-            position={{ base: 'absolute', md: 'relative' }}
-            left={{ base: '55%', md: 0 }}
-            transform={{ base: 'translateX(-50%)', md: 'none' }}
-            ml={0}
-          >
-            <RouterLink to="/">Seikowo Team</RouterLink>
-          </Box>
+        <Box flex="0 0 auto" minW="120px">
+          <NavLogo />
+        </Box>
 
-          <Flex display={{ base: 'none', md: 'flex' }} ml={10} align="center" minW={0}>
-            <DesktopNav 
-              menuItems={menuItems}
-              isActive={isActive}
-              hoverBg={hoverBg}
-              activeColor={activeColor}
-              textColor={textColor}
-            />
-          </Flex>
+        <Flex flex={1} justify="center" align="center" minW={0} position="relative">
+          <NavMenuDesktop
+            menuItems={menuItems}
+            isActive={isActive}
+            hoverBg={hoverBg}
+            activeColor={activeColor}
+            textColor={textColor}
+          />
         </Flex>
 
-        <Stack
-          flex={{ base: '0 0 auto' }}
-          justify={'flex-end'}
-          direction={'row'}
-          spacing={2}
-          align="center"
-          h="100%"
-        >
-          <IconButton
-            size="sm"
-            aria-label="Search"
-            icon={<SearchIcon />}
-            variant="ghost"
-            onClick={handleOpenSearch}
-            display="flex"
-            alignItems="center"
+        <Box flex="0 0 auto">
+          <NavActions
+            colorMode={colorMode}
+            handleToggleColorMode={handleToggleColorMode}
+            handleOpenSearch={handleOpenSearch}
+            accessToken={accessToken}
+            onLogin={handleLogin}
+            onLogout={handleLogout}
           />
-          <IconButton
-            size="sm"
-            aria-label="Toggle color mode"
-            icon={colorMode === 'light' ? <MoonIcon /> : <SunIcon />}
-            onClick={handleToggleColorMode}
-            variant="ghost"
-            display="flex"
-            alignItems="center"
-          />
-        </Stack>
+        </Box>
       </Flex>
 
-      <MobileNav menuItems={menuItems} isOpen={isOpen} />
+      <NavMenuMobile menuItems={menuItems} isOpen={isOpen} />
       <SearchModal />
     </Box>
   );

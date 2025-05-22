@@ -53,7 +53,7 @@ const deriveTagsFromPosts = (postsData) => {
 const TagsList = () => {
   const [loading, setLoading] = useState(true);
   const scrollRef = useRef(null);
-  const { posts, selectedTag, setSelectedTag } = useBlogStore();
+  const { posts, selectedTag, setSelectedTag, getFilteredPosts } = useBlogStore();
 
   const { colorMode } = useColorMode();
   const bgColor = useColorModeValue('white', 'gray.800');

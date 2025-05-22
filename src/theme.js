@@ -11,8 +11,8 @@ const breakpoints = {
 
 // Font configuration
 const fonts = {
-  heading: "'Noto Sans JP', 'Be Vietnam Pro', sans-serif",
-  body: "'Noto Sans JP', 'Be Vietnam Pro', sans-serif",
+  heading: "'Inter', 'Be Vietnam Pro', sans-serif",
+  body: "'Inter', 'Be Vietnam Pro', sans-serif",
   mono: "'JetBrains Mono', monospace",
 };
 
@@ -58,8 +58,8 @@ const theme = extendTheme({
   styles: {
     global: (props) => ({
       'html, body': {
-        bg: props.colorMode === 'dark' ? 'gray.900' : 'white',
-        color: props.colorMode === 'dark' ? 'white' : 'gray.800',
+        bg: props.colorMode === 'dark' ? '#1A202C' : '#FFFFFF',
+        color: props.colorMode === 'dark' ? '#E2E8F0' : '#2D3748',
       },
       'body': {
         minHeight: '100vh',
@@ -72,6 +72,7 @@ const theme = extendTheme({
         fontWeight: 'bold',
         letterSpacing: '-0.02em',
         lineHeight: 1.5,
+        color: props.colorMode === 'dark' ? '#FFFFFF' : '#1A202C',
       },
       '.chakra-heading': {
         fontFamily: fonts.heading,
@@ -93,6 +94,18 @@ const theme = extendTheme({
         letterSpacing: '-0.02em',
         lineHeight: 1.5,
         fontWeight: 'bold',
+      },
+      // Tối ưu cho dark mode
+      '.dark-mode': {
+        bg: props.colorMode === 'dark' ? '#1A202C' : '#FFFFFF',
+        color: props.colorMode === 'dark' ? '#E2E8F0' : '#2D3748',
+      },
+      // Tối ưu cho các components
+      '.chakra-button, .chakra-input, .chakra-select, .chakra-textarea': {
+        transition: 'all 0.2s ease-out',
+      },
+      '.chakra-card, .chakra-modal, .chakra-drawer': {
+        transition: 'background-color 0.2s ease-out, border-color 0.2s ease-out',
       }
     }),
   },
@@ -105,7 +118,81 @@ const theme = extendTheme({
       xl: '1200px',
       xxl: '1600px'
     }
-  }
+  },
+  // Tối ưu màu sắc cho dark mode
+  colors: {
+    gray: {
+      50: '#F7FAFC',
+      100: '#EDF2F7',
+      200: '#E2E8F0',
+      300: '#CBD5E0',
+      400: '#A0AEC0',
+      500: '#718096',
+      600: '#4A5568',
+      700: '#2D3748',
+      800: '#1A202C',
+      900: '#171923',
+    },
+    blue: {
+      50: '#EBF8FF',
+      100: '#BEE3F8',
+      200: '#90CDF4',
+      300: '#63B3ED',
+      400: '#4299E1',
+      500: '#3182CE',
+      600: '#2B6CB0',
+      700: '#2C5282',
+      800: '#2A4365',
+      900: '#1A365D',
+    },
+    // Thêm các màu accent từ Chakra UI docs
+    accent: {
+      light: '#3182CE', // blue.500
+      dark: '#63B3ED',  // blue.300
+    },
+    // Màu cho code blocks
+    code: {
+      light: '#F7FAFC', // gray.50
+      dark: '#2D3748',  // gray.700
+    },
+    // Màu cho borders
+    border: {
+      light: '#E2E8F0', // gray.200
+      dark: '#4A5568',  // gray.600
+    },
+  },
+  // Tối ưu shadows cho dark mode
+  shadows: {
+    sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+    base: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+    md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+    lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+    xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+    '2xl': '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+    outline: '0 0 0 3px rgba(66, 153, 225, 0.6)',
+    inner: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)',
+    none: 'none',
+  },
+  // Tối ưu transitions
+  transition: {
+    property: {
+      common: 'background-color, border-color, color, fill, stroke, opacity, box-shadow, transform',
+    },
+    easing: {
+      'ease-in': 'cubic-bezier(0.4, 0, 1, 1)',
+      'ease-out': 'cubic-bezier(0, 0, 0.2, 1)',
+      'ease-in-out': 'cubic-bezier(0.4, 0, 0.2, 1)',
+    },
+    duration: {
+      'ultra-fast': '50ms',
+      faster: '100ms',
+      fast: '200ms',
+      normal: '300ms',
+      slow: '500ms',
+      slower: '700ms',
+      'ultra-slow': '1000ms',
+    },
+  },
 });
 
 export default theme; 
