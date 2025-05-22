@@ -57,4 +57,41 @@ export const gridConfig = {
   lg: { cols: 4, items: 8 },      // Desktop: 4 columns x 2 rows = 8 items
   xl: { cols: 5, items: 10 },     // Large Desktop: 5 columns x 2 rows = 10 items
   '2xl': { cols: 5, items: 10 }   // Extra Large: 5 columns x 2 rows = 10 items
+};
+
+// Get thumbnail by comparing slugs
+export const getThumbnailBySlug = (posts, targetSlug) => {
+  if (!posts || !targetSlug) return null;
+
+  // Normalize the target slug
+  const normalizedTargetSlug = targetSlug.replace(/^\/+|\/+$/g, '');
+
+  // Find the post with matching slug
+  const matchingPost = posts.find(post => {
+    if (!post.url) return false;
+    const postSlug = getSlugFromUrl(post.url);
+    return postSlug === normalizedTargetSlug;
+  });
+
+  if (!matchingPost) return null;
+
+  // First try to get thumbnail from post metadata
+  if (matchingPost.thumbnail) {
+    return matchingPost.thumbnail;
+  }
+
+  // Then try to extract from content
+  if (matchingPost.content) {
+    const contentThumbnail = extractImage(matchingPost.content);
+    if (contentThumbnail) {
+      return contentThumbnail;
+    }
+  }
+
+  // If no thumbnail found, try to get first image from images array
+  if (matchingPost.images && matchingPost.images.length > 0) {
+    return matchingPost.images[0];
+  }
+
+  return null;
 }; 

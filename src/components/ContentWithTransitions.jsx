@@ -5,6 +5,7 @@ import { Box } from '@chakra-ui/react';
 import HomePage from '../pages/HomePage';
 import PostPage from '../pages/PostPage';
 import TagPage from './TagPage/TagPage';
+import UserHistoryPage from '../pages/HistoryPage';
 
 // Memoize static pages
 const StaticPage = memo(({ children }) => (
@@ -24,6 +25,7 @@ const ContentWithTransitions = () => {
         <Routes location={location} key={location.pathname}>
           <Route path="/" element={<HomePage />} />
           <Route path="/tag/:tagName" element={<TagPage />} />
+          <Route path="/u/:userId" element={<UserHistoryPage />} />
           <Route 
             path="/categories" 
             element={

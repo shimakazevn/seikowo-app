@@ -1,9 +1,14 @@
 <!DOCTYPE html>
-<html lang="vi" data-bs-theme='dark'  lang='en'>
+<html lang="vi">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Seikowo React</title>
+  <script>
+    // Check system color scheme preference
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.classList.toggle('dark', prefersDark);
+  </script>
 </head>
 <body>
   <div id="root" class="dark-mode"></div>
