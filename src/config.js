@@ -1,6 +1,14 @@
 export const blogConfig = {
-  blogId: '6221083388124973077', // Thay blogId bạn
-  apiKey: 'AIzaSyAygK6w9GS-UuEqzlfYr77YSAv35Mrmfvc', // Thay apiKey bạn
+  title: 'Seikowo Team',
+  description: 'built with React and Chakra UI',
+  author: 'Shimakazevn',
+  social: {
+    twitter: 'https://twitter.com/shimakazevn',
+    github: 'https://github.com/shimakazevn',
+    linkedin: 'https://linkedin.com/in/shimakazevn',
+  },
+  blogId: '6221083388124973077',
+  apiKey: 'AIzaSyAygK6w9GS-UuEqzlfYr77YSAv35Mrmfvc'
 };
 
 export const mainMenuItems = [

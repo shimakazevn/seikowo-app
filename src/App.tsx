@@ -6,7 +6,7 @@ import Nav from './components/Nav';
 import ContentWithTransitions from './components/ContentWithTransitions';
 import theme from './theme';
 
-function App() {
+const App = (): React.ReactElement => {
   return (
     <ChakraProvider theme={theme}>
       <Global
@@ -24,6 +24,6 @@ function App() {
       </Router>
     </ChakraProvider>
   );
-}
+};
 
-export default App;
+export default App; 
