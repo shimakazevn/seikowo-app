@@ -1,0 +1,94 @@
+/* Page Transitions */
+.page-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms, transform 300ms;
+}
+
+.page-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.page-exit-active {
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: opacity 300ms, transform 300ms;
+}
+
+/* Post Content Styles */
+.post-content {
+  line-height: 1.8;
+}
+
+.post-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+.post-content p {
+  margin-bottom: 1.5rem;
+}
+
+.post-content h2,
+.post-content h3,
+.post-content h4 {
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.post-content a {
+  color: #3182ce;
+  text-decoration: none;
+}
+
+.post-content a:hover {
+  text-decoration: underline;
+}
+
+.post-content blockquote {
+  border-left: 4px solid #e2e8f0;
+  padding-left: 1rem;
+  margin: 1.5rem 0;
+  color: #4a5568;
+}
+
+.post-content pre {
+  background: #f7fafc;
+  padding: 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 1.5rem 0;
+}
+
+.post-content code {
+  background: #f7fafc;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .post-content blockquote {
+    border-left-color: #2d3748;
+    color: #a0aec0;
+  }
+
+  .post-content pre,
+  .post-content code {
+    background: #2d3748;
+  }
+
+  .post-content a {
+    color: #63b3ed;
+  }
+} 
