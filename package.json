@@ -1,0 +1,24 @@
+{
+  "name": "blogger-react-spa",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@glidejs/glide": "^3.7.1",
+    "framer-motion": "^10.16.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-lazy-load-image-component": "^1.6.0",
+    "react-router-dom": "^6.18.0",
+    "react-transition-group": "^4.4.5"
+  },
+  "scripts": {
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.1.0",
+    "sass": "^1.69.5",
+    "vite": "^4.5.0"
+  }
+}

@@ -1,0 +1,90 @@
+.post-card {
+  display: flex;
+  flex-direction: row;
+  height: 300px;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  background-color: #1a1a1a;
+  color: white;
+}
+@media screen and (max-width: 768px) {
+  .post-card {
+    height: 140px;
+  }
+  
+}
+.post-thumb img {
+
+  height: 100%;
+  width: auto;
+  object-fit: cover;
+}
+
+.post-body {
+  flex: 1;
+  position: relative;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.post-bg-blur {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  filter: blur(8px);
+  opacity: 0.3;
+  z-index: 1;
+}
+
+.post-content {
+  position: relative;
+  z-index: 2;
+}
+
+.post-title {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.post-excerpt {
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.skeleton-card {
+  height: 300px;
+  background: linear-gradient(90deg, #333 25%, #444 37%, #333 63%);
+  background-size: 400% 100%;
+  animation: skeleton-loading 1.2s infinite;
+  border-radius: 12px;
+}
+
+@keyframes skeleton-loading {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+.post-excerpt {
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: #ddd;
+}
+
+.badge {
+  font-size: 0.75rem;
+  padding: 0.4em 0.6em;
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
