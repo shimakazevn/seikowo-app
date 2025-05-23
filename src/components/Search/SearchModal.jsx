@@ -39,6 +39,8 @@ import 'react-date-range/dist/theme/default.css';
 import useSearchStore from '../../store/useSearchStore';
 import { Link } from 'react-router-dom';
 import { getSlugFromUrl } from '../../utils/blogUtils';
+import { LazyLoadImage } from 'react-lazy-load-image-component';
+import 'react-lazy-load-image-component/src/effects/blur.css';
 
 // Constants
 const SEARCH_HISTORY_KEY = 'search_history';
@@ -373,14 +375,13 @@ const ResultItem = React.memo(({ result, onClose, handleTagClick, hoverBg, image
           borderRadius="md"
           overflow="hidden"
         >
-          <Image
-            src={thumbnail || 'https://via.placeholder.com/80x120?text=No+Image'}
+          <LazyLoadImage
+            src={thumbnail || './images/no-image.png'}
             alt={result.title}
             width="100%"
             height="100%"
-            objectFit="cover"
-            bg={imageBg}
-            loading="lazy"
+            effect="blur"
+            style={{ objectFit: 'cover', width: '100%', height: '100%' }}
           />
         </Box>
         <Box flex="1" minWidth="0">
@@ -475,6 +476,7 @@ const SearchResults = React.memo(({ searchResults, closeSearch, handleTagClick, 
     <Box
       ref={resultsContainerRef}
       height="400px"
+      overflowY="auto"
       position="relative"
       onClick={(e) => e.stopPropagation()}
       css={{
@@ -497,11 +499,6 @@ const SearchResults = React.memo(({ searchResults, closeSearch, handleTagClick, 
             outline: 'none',
           },
           WebkitOverflowScrolling: 'touch',
-          '&::-webkit-scrollbar': {
-            display: 'none'
-          },
-          msOverflowStyle: 'none',
-          scrollbarWidth: 'none',
         },
       }}
     >
@@ -616,10 +613,11 @@ const SearchModal = () => {
   }, [openSearch, closeSearch]);
 
   // Theme values
-  const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const hoverBg = useColorModeValue('gray.50', 'gray.700');
   const imageBg = useColorModeValue('gray.100', 'gray.700');
+  const textColor = useColorModeValue('gray.600', 'gray.400');
+  const text2Color = useColorModeValue('gray.700', 'gray.500');
 
   const saveSearchResults = (query, results) => {
     const searchCache = JSON.parse(localStorage.getItem(SEARCH_CACHE_KEY) || '[]');
@@ -650,11 +648,13 @@ const SearchModal = () => {
     >
       <ModalOverlay backdropFilter="blur(10px)" />
       <ModalContent
-        bg={bgColor}
+        backdropFilter="blur(30px)"
+        bg={useColorModeValue("rgba(255, 255, 255, 0.48)", "rgba(26, 32, 44, 0.48)")}
         borderRadius="xl"
         boxShadow="xl"
         maxW="800px"
         mx={4}
+        maxH="80vh"
         onClick={(e) => e.stopPropagation()}
       >
         <Box p={4}>
@@ -668,12 +668,13 @@ const SearchModal = () => {
             placeholder="Search posts, tags, or content..."
             size="lg"
             variant="filled"
-            bg={useColorModeValue('gray.50', 'gray.700')}
-            _hover={{ bg: useColorModeValue('gray.100', 'gray.600') }}
+            bg={useColorModeValue("rgba(255, 255, 255, 0.48)", "rgba(26, 32, 44, 0.48)")}
+            _hover={{ bg: useColorModeValue("rgba(255,255,255,0.68)", "rgba(26,32,44,0.68)") }}
             _focus={{ bg: useColorModeValue('white', 'gray.600') }}
+            _placeholder={{ color: useColorModeValue("rgba(255,255,255,0.68)", "rgba(26,32,44,0.68)") }}
             borderRadius="lg"
           />
-          <Text fontSize="xs" color="gray.500" mt={2}>
+          <Text fontSize="xs" color={textColor} mt={2}>
             Press ⌘K to search, Esc to close
           </Text>
         </Box>
@@ -689,6 +690,10 @@ const SearchModal = () => {
               w="150px"
               borderRadius="lg"
               variant="filled"
+              bg={useColorModeValue("rgba(255, 255, 255, 0.48)", "rgba(26, 32, 44, 0.48)")}
+              _hover={{ bg: useColorModeValue("rgba(255,255,255,0.68)", "rgba(26,32,44,0.68)") }}
+              _focus={{ bg: useColorModeValue("rgba(255,255,255,0.68)", "rgba(26,32,44,0.68)") }}
+              _placeholder={{ color: useColorModeValue("rgba(0, 0, 0, 0.68)", "rgba(255, 255, 255, 0.68)") }}
             >
               <option value="title">Tiêu đề</option>
               <option value="date">Ngày đăng</option>
@@ -714,7 +719,7 @@ const SearchModal = () => {
 
           {searchQuery.length === 0 && recentSearches.length > 0 && (
             <VStack align="stretch" spacing={2}>
-              <Text fontSize="sm" color="gray.500">Recent Searches</Text>
+              <Text fontSize="sm" color={textColor}>Recent Searches</Text>
               {recentSearches.map((search, index) => (
                 <Button
                   key={index}
@@ -722,6 +727,11 @@ const SearchModal = () => {
                   justifyContent="flex-start"
                   onClick={() => handleRecentSearchClick(search)}
                   leftIcon={<SearchIcon />}
+                  color={text2Color}
+                  _hover={{
+                    bg: useColorModeValue("rgba(255, 255, 255, 0.68)", "rgba(26, 32, 44, 0.68)"),
+                    color: useColorModeValue("black", "gray.200"),
+                  }}
                 >
                   {search}
                 </Button>
@@ -742,16 +752,16 @@ const SearchModal = () => {
               </Box>
             ) : searchResults.length === 0 ? (
               <Box py={6} textAlign="center">
-                <Text>Không tìm thấy kết quả</Text>
+                <Text color={textColor}>Không tìm thấy kết quả</Text>
               </Box>
             ) : (
-              <SearchResults
-                searchResults={searchResults}
-                closeSearch={closeSearch}
-                handleTagClick={handlers.handleTagClick}
-                hoverBg={hoverBg}
-                imageBg={imageBg}
-              />
+                <SearchResults
+                  searchResults={searchResults}
+                  closeSearch={closeSearch}
+                  handleTagClick={handlers.handleTagClick}
+                  hoverBg={hoverBg}
+                  imageBg={imageBg}
+                />
             )
           )}
         </Box>

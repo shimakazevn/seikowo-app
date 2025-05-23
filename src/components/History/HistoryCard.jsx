@@ -1,8 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Box, Text, Image, Skeleton, Badge, HStack, VStack, Progress } from '@chakra-ui/react';
-import { motion } from 'framer-motion';
 import { optimizeThumbnail, getThumbnailBySlug, extractImage } from '../../utils/blogUtils';
+import { motion } from 'framer-motion';
 
 const MotionBox = motion(Box);
 
@@ -41,13 +41,10 @@ const HistoryCard = ({
 
   return (
     <MotionBox
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ 
-        duration: 0.3, 
-        delay: index * 0.1,
-        ease: 'easeOut'
-      }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
       borderWidth="1px"
       borderRadius="lg"
       overflow="hidden"

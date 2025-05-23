@@ -1,25 +1,21 @@
 import React from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { Box, useColorModeValue, useBreakpointValue } from '@chakra-ui/react';
+import { blogConfig } from '../../config';
 
 const NavLogo = () => (
   <Box
     textAlign={useBreakpointValue({ base: 'center', md: 'left' })}
-    fontFamily={'heading'}
+    fontFamily={'Be Vietnam Pro'}
     color={useColorModeValue('gray.800', 'white')}
-    fontWeight="bold"
-    fontSize={{ base: 'md', md: 'xl' }}
-    minW={0}
-    flex="0 1 auto"
-    whiteSpace="nowrap"
-    overflow="hidden"
-    textOverflow="ellipsis"
-    position={{ base: 'absolute', md: 'relative' }}
-    left={{ base: '55%', md: 0 }}
-    transform={{ base: 'translateX(-50%)', md: 'none' }}
-    ml={0}
+    fontWeight="medium"
+    fontSize={{ base: 'lg', md: 'xl' }}
+    ms={2}
+    zIndex={1000}
+    display="block"
+    alignItems="center"
   >
-    <RouterLink to="/">Seikowo Team</RouterLink>
+    <RouterLink to="/">{blogConfig.title}</RouterLink>
   </Box>
 );
 

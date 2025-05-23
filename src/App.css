@@ -1,0 +1,7 @@
+/* Disable all transitions and transforms for Chakra UI tab panels and their children */
+.chakra-tabs__tab-panel,
+.chakra-tabs__tab-panel * {
+  transition: none !important;
+  transform: none !important;
+  filter: none !important;
+} 

@@ -1,29 +1,34 @@
 import React, { memo } from 'react';
-import { Box, VStack, Collapse, Flex, Link, Text, Icon, useColorModeValue, useDisclosure } from '@chakra-ui/react';
+import { Box, VStack, Collapse, Flex, Text, Icon, useColorModeValue, useDisclosure } from '@chakra-ui/react';
 import { ChevronDownIcon } from '@chakra-ui/icons';
+import NavLink from './NavLink';
 
-const MobileNavItem = memo(({ name, children, path }) => {
+const MobileNavItem = memo(({ name, children, path, isActive, activeColor, textColor, hoverColor, onNavigate }) => {
   const { isOpen, onToggle } = useDisclosure();
 
   return (
     <Box 
       onClick={children && onToggle}
-      style={{ background: 'transparent' }}
       width="100%"
     >
-      <Flex
+      <NavLink
+        to={path ?? '#'}
+        isActive={isActive}
+        activeColor={activeColor}
+        textColor={textColor}
+        hoverColor={hoverColor}
         py={2}
-        as={Link}
-        href={path ?? '#'}
-        justify={'space-between'}
-        align={'center'}
-        style={{ background: 'transparent' }}
+        px={2}
+        display="flex"
+        alignItems="center"
+        justifyContent="space-between"
         width="100%"
+        fontWeight={600}
+        onClick={!children && onNavigate ? onNavigate : undefined}
       >
         <Box flex="1" minW={0}>
           <Text
             fontWeight={600}
-            color={useColorModeValue('gray.600', 'gray.200')}
             noOfLines={1}
           >
             {name}
@@ -40,8 +45,8 @@ const MobileNavItem = memo(({ name, children, path }) => {
             />
           </Box>
         )}
-      </Flex>
-      <Collapse in={isOpen} animateOpacity style={{ marginTop: '0!important', background: 'transparent' }}>
+      </NavLink>
+      <Collapse in={isOpen} animateOpacity style={{ marginTop: '0!important' }}>
         <VStack
           mt={2}
           pl={4}
@@ -50,23 +55,28 @@ const MobileNavItem = memo(({ name, children, path }) => {
           borderColor={useColorModeValue('gray.200', 'gray.700')}
           align="stretch"
           spacing={2}
-          style={{ background: 'transparent' }}
           width="100%"
+          borderRadius="md"
+          p={2}
         >
           {children &&
             children.map((child) => (
-              <Link 
-                key={child.name} 
-                py={2} 
-                href={child.path}
-                style={{ background: 'transparent' }}
+              <NavLink
+                key={child.name}
+                to={child.path}
+                isActive={isActive}
+                activeColor={activeColor}
+                textColor={textColor}
+                hoverColor={hoverColor}
+                py={2}
+                px={2}
+                borderRadius="md"
+                fontWeight={600}
+                onClick={onNavigate}
                 display="block"
-                width="100%"
               >
-                <Text noOfLines={1}>
-                  {child.name}
-                </Text>
-              </Link>
+                <Text noOfLines={1}>{child.name}</Text>
+              </NavLink>
             ))}
         </VStack>
       </Collapse>
@@ -76,28 +86,35 @@ const MobileNavItem = memo(({ name, children, path }) => {
 
 MobileNavItem.displayName = 'MobileNavItem';
 
-const MobileNav = memo(({ menuItems, isOpen }) => {
+const MobileNav = memo(({ menuItems, isOpen, isActive, activeColor, textColor, hoverColor, onNavigate }) => {
   return (
-    <Collapse in={isOpen} animateOpacity>
-      <Box
-        style={{ background: 'transparent' }}
-        p={4}
-        display={{ md: 'none' }}
-        maxW="100vw"
-        overflowX="hidden"
-      >
+    <Box
+      display={{ md: 'none' }}
+      position="relative"
+      shadow="lg"
+    >
+      <Collapse in={isOpen} animateOpacity>
         <VStack
-          spacing={4}
+          spacing={2}
           align="stretch"
           width="100%"
-          style={{ background: 'transparent' }}
+          px={4}
+          mb={4}
         >
           {menuItems.map((navItem) => (
-            <MobileNavItem key={navItem.path} {...navItem} />
+            <MobileNavItem
+              key={navItem.path}
+              {...navItem}
+              isActive={isActive}
+              activeColor={activeColor}
+              textColor={textColor}
+              hoverColor={hoverColor}
+              onNavigate={onNavigate}
+            />
           ))}
         </VStack>
-      </Box>
-    </Collapse>
+      </Collapse>
+    </Box>
   );
 });
 
