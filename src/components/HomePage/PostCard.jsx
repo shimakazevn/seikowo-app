@@ -1,8 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Box, Text, Image, Skeleton, Badge } from '@chakra-ui/react';
+import { Box, Text, Skeleton, Badge } from '@chakra-ui/react';
 import { motion } from 'framer-motion';
 import { extractImage, optimizeThumbnail, getSlugFromUrl, getThumbnailBySlug } from '../../utils/blogUtils';
+import { LazyLoadImage } from 'react-lazy-load-image-component';
+import 'react-lazy-load-image-component/src/effects/opacity.css';
 
 const MotionBox = motion(Box);
 
@@ -76,23 +78,24 @@ const PostCard = ({ post, index, cardBg, textColor, mutedTextColor, extraInfo, a
             right={0}
             bottom={0}
           >
-            <Image
+            <LazyLoadImage
               src={thumbnail ? optimizeThumbnail(thumbnail, 600) : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjkwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGFsaWdubWVudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZmlsbD0iIzY2NiI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+'}
               alt={post.title}
               width="100%"
               height="100%"
-              objectFit="cover"
-              objectPosition="center top"
-              transition="transform 0.3s ease"
-              fallback={<Skeleton height="100%" />}
-              loading="lazy"
-              sx={{
+              effect="opacity"
+              style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
                 width: '100%',
-                height: '100%'
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'center top',
+                transition: 'transform 0.3s ease'
               }}
+              wrapperClassName="chakra-image"
+              placeholderSrc={undefined}
             />
             {post.labels && post.labels[0] && (
               <Badge

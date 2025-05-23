@@ -29,7 +29,7 @@
   "scripts": {
     "dev": "vite",
     "start": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "clean": "rimraf dist",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx",

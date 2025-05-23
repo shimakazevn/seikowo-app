@@ -1,17 +1,20 @@
 import React, { memo } from 'react';
-import { Stack, Box, Link, Popover, PopoverTrigger, PopoverContent, useColorModeValue } from '@chakra-ui/react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Stack, Box, Popover, PopoverTrigger, PopoverContent, useColorModeValue } from '@chakra-ui/react';
+import NavLink from './NavLink';
 import { ChevronRightIcon } from '@chakra-ui/icons';
 
-const DesktopSubNav = memo(({ name, path }) => {
+const DesktopSubNav = memo(({ name, path, isActive, activeColor, textColor, hoverColor }) => {
   return (
-    <Link
-      href={path}
-      role={'group'}
-      display={'block'}
+    <NavLink
+      to={path}
+      isActive={isActive}
+      activeColor={activeColor}
+      textColor={textColor}
+      hoverColor={hoverColor}
       p={2}
-      rounded={'md'}
-      _hover={{ bg: useColorModeValue('pink.50', 'gray.900') }}
+      rounded="md"
+      fontWeight={500}
+      display="block"
     >
       <Stack direction={'row'} align={'center'} style={{ background: 'transparent' }}>
         <Box>
@@ -21,7 +24,6 @@ const DesktopSubNav = memo(({ name, path }) => {
           transition={'all .3s ease'}
           transform={'translateX(-10px)'}
           opacity={0}
-          _groupHover={{ opacity: '100%', transform: 'translateX(0)' }}
           justifyContent={'flex-end'}
           alignItems={'center'}
           flex={1}
@@ -29,15 +31,13 @@ const DesktopSubNav = memo(({ name, path }) => {
           <ChevronRightIcon color={'pink.400'} w={5} h={5} />
         </Box>
       </Stack>
-    </Link>
+    </NavLink>
   );
 });
 
 DesktopSubNav.displayName = 'DesktopSubNav';
 
-const DesktopNav = memo(({ menuItems, isActive, hoverBg, activeColor, textColor }) => {
-  const linkColor = useColorModeValue('gray.600', 'gray.200');
-  const linkHoverColor = useColorModeValue('gray.800', 'white');
+const DesktopNav = memo(({ menuItems, isActive, activeColor, textColor, hoverColor }) => {
   const popoverContentBgColor = useColorModeValue('white', 'gray.800');
 
   return (
@@ -46,20 +46,19 @@ const DesktopNav = memo(({ menuItems, isActive, hoverBg, activeColor, textColor 
         <Box key={navItem.path}>
           <Popover trigger={'hover'} placement={'bottom-start'}>
             <PopoverTrigger>
-              <Link
-                as={RouterLink}
+              <NavLink
                 to={navItem.path}
+                isActive={isActive}
+                activeColor={activeColor}
+                textColor={textColor}
+                hoverColor={hoverColor}
                 p={2}
                 fontSize={'sm'}
                 fontWeight={500}
-                color={linkColor}
-                _hover={{
-                  textDecoration: 'none',
-                  color: linkHoverColor,
-                }}
+                rounded="md"
               >
                 {navItem.name}
-              </Link>
+              </NavLink>
             </PopoverTrigger>
             {navItem.children && (
               <PopoverContent
@@ -72,7 +71,7 @@ const DesktopNav = memo(({ menuItems, isActive, hoverBg, activeColor, textColor 
               >
                 <Stack style={{ background: 'transparent' }}>
                   {navItem.children.map((child) => (
-                    <DesktopSubNav key={child.name} {...child} />
+                    <DesktopSubNav key={child.name} {...child} isActive={isActive} activeColor={activeColor} textColor={textColor} hoverColor={hoverColor} />
                   ))}
                 </Stack>
               </PopoverContent>

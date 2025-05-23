@@ -41,6 +41,7 @@ import {
   SearchIcon,
   CloseIcon,
   ChevronRightIcon,
+  TimeIcon,
 } from '@chakra-ui/icons';
 import SearchModal from './Search/SearchModal';
 import useSearchStore from '../store/useSearchStore';
@@ -56,35 +57,7 @@ import {
   FOLLOW_KEY,
   MANGA_KEY
 } from '../utils/historyUtils';
-
-const MotionIconButton = motion(IconButton);
-
-// Memoize NavLink component with forwardRef
-const NavLink = memo(React.forwardRef(({ to, children, isMobile = false, isActive, hoverBg, activeColor, textColor, ...props }, ref) => (
-  <Link
-    ref={ref}
-    as={RouterLink}
-    to={to}
-    px={3}
-    py={2}
-    rounded="md"
-    _hover={{
-      textDecoration: 'none',
-      bg: hoverBg,
-    }}
-    bg={isActive(to) ? hoverBg : 'transparent'}
-    color={isActive(to) ? activeColor : textColor}
-    w={isMobile ? "full" : "auto"}
-    textAlign={isMobile ? "left" : "center"}
-    fontSize="sm"
-    fontWeight="medium"
-    {...props}
-  >
-    {children}
-  </Link>
-)));
-
-NavLink.displayName = 'NavLink';
+import NavLink from './Nav/NavLink';
 
 const DesktopSubNav = memo(({ name, path }) => {
   return (
@@ -94,13 +67,16 @@ const DesktopSubNav = memo(({ name, path }) => {
       display={'block'}
       p={2}
       rounded={'md'}
-      _hover={{ bg: useColorModeValue('pink.50', 'gray.900') }}
+      _hover={{
+        color: useColorModeValue('blue.600', 'blue.300'),
+        textDecoration: 'none',
+      }}
     >
       <Stack direction={'row'} align={'center'} style={{ background: 'transparent' }}>
         <Box>
           <Text
             transition={'all .3s ease'}
-            _groupHover={{ color: 'pink.400' }}
+            _groupHover={{}}
             fontWeight={500}
           >
             {name}
@@ -110,7 +86,7 @@ const DesktopSubNav = memo(({ name, path }) => {
           transition={'all .3s ease'}
           transform={'translateX(-10px)'}
           opacity={0}
-          _groupHover={{ opacity: '100%', transform: 'translateX(0)' }}
+          _groupHover={{}}
           justify={'flex-end'}
           align={'center'}
           flex={1}
@@ -125,51 +101,20 @@ const DesktopSubNav = memo(({ name, path }) => {
 DesktopSubNav.displayName = 'DesktopSubNav';
 
 // Memoize DesktopNav component
-const DesktopNav = memo(({ menuItems, isActive, hoverBg, activeColor, textColor }) => {
-  const linkColor = useColorModeValue('gray.600', 'gray.200');
-  const linkHoverColor = useColorModeValue('gray.800', 'white');
-  const popoverContentBgColor = useColorModeValue('white', 'gray.800');
-
+const DesktopNav = memo(({ menuItems, isActive, activeColor, textColor, hoverColor }) => {
   return (
     <Stack direction={'row'} spacing={4} style={{ background: 'transparent' }}>
       {menuItems.map((navItem) => (
-        <Box key={navItem.path}>
-          <Popover trigger={'hover'} placement={'bottom-start'}>
-            <PopoverTrigger>
-              <Link
-                as={RouterLink}
-                to={navItem.path}
-                p={2}
-                fontSize={'sm'}
-                fontWeight={500}
-                color={linkColor}
-                _hover={{
-                  textDecoration: 'none',
-                  color: linkHoverColor,
-                }}
-              >
-                {navItem.name}
-              </Link>
-            </PopoverTrigger>
-
-            {navItem.children && (
-              <PopoverContent
-                border={0}
-                boxShadow={'xl'}
-                bg={popoverContentBgColor}
-                p={4}
-                rounded={'xl'}
-                minW={'sm'}
-              >
-                <Stack style={{ background: 'transparent' }}>
-                  {navItem.children.map((child) => (
-                    <DesktopSubNav key={child.name} {...child} />
-                  ))}
-                </Stack>
-              </PopoverContent>
-            )}
-          </Popover>
-        </Box>
+        <NavLink
+          key={navItem.path}
+          to={navItem.path}
+          isActive={isActive}
+          activeColor={activeColor}
+          textColor={textColor}
+          hoverColor={hoverColor}
+        >
+          {navItem.name}
+        </NavLink>
       ))}
     </Stack>
   );
@@ -178,8 +123,10 @@ const DesktopNav = memo(({ menuItems, isActive, hoverBg, activeColor, textColor 
 DesktopNav.displayName = 'DesktopNav';
 
 // Memoize MobileNavItem component
-const MobileNavItem = memo(({ name, children, path }) => {
+const MobileNavItem = memo(({ name, children, path, isActive }) => {
   const { isOpen, onToggle } = useDisclosure();
+  const location = useLocation();
+  const isItemActive = isActive ? isActive(path) : location.pathname === path;
 
   return (
     <Box 
@@ -189,17 +136,18 @@ const MobileNavItem = memo(({ name, children, path }) => {
     >
       <Flex
         py={2}
-        as={Link}
-        href={path ?? '#'}
+        as={RouterLink}
+        to={path ?? '#'}
         justify={'space-between'}
         align={'center'}
         style={{ background: 'transparent' }}
         width="100%"
+        color={isItemActive ? useColorModeValue('blue.600', 'blue.200') : useColorModeValue('gray.600', 'gray.200')}
+        fontWeight={isItemActive ? 600 : 500}
       >
         <Box flex="1" minW={0}>
           <Text
-            fontWeight={600}
-            color={useColorModeValue('gray.600', 'gray.200')}
+            fontWeight={isItemActive ? 600 : 500}
             noOfLines={1}
           >
             {name}
@@ -229,21 +177,30 @@ const MobileNavItem = memo(({ name, children, path }) => {
           spacing={2}
           style={{ background: 'transparent' }}
           width="100%"
+          borderRadius="md"
+          p={2}
         >
           {children &&
             children.map((child) => (
-              <Link 
+              <RouterLink 
                 key={child.name} 
-                py={2} 
-                href={child.path}
-                style={{ background: 'transparent' }}
-                display="block"
-                width="100%"
+                to={child.path}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  padding: '0.5rem',
+                  borderRadius: '0.375rem',
+                  color: location.pathname === child.path 
+                    ? useColorModeValue('blue.600', 'blue.200')
+                    : useColorModeValue('gray.600', 'gray.200'),
+                  fontWeight: location.pathname === child.path ? 600 : 500,
+                  transition: 'all 0.2s ease'
+                }}
               >
                 <Text noOfLines={1}>
                   {child.name}
                 </Text>
-              </Link>
+              </RouterLink>
             ))}
         </VStack>
       </Collapse>
@@ -254,7 +211,7 @@ const MobileNavItem = memo(({ name, children, path }) => {
 MobileNavItem.displayName = 'MobileNavItem';
 
 // Memoize MobileNav component
-const MobileNav = memo(({ menuItems, isOpen }) => {
+const MobileNav = memo(({ menuItems, isOpen, isActive, activeColor, textColor, hoverColor, onNavigate }) => {
   return (
     <Collapse in={isOpen} animateOpacity>
       <Box
@@ -271,7 +228,15 @@ const MobileNav = memo(({ menuItems, isOpen }) => {
           style={{ background: 'transparent' }}
         >
           {menuItems.map((navItem) => (
-            <MobileNavItem key={navItem.path} {...navItem} />
+            <MobileNavItem
+              key={navItem.path}
+              {...navItem}
+              isActive={isActive}
+              activeColor={activeColor}
+              textColor={textColor}
+              hoverColor={hoverColor}
+              onNavigate={onNavigate}
+            />
           ))}
         </VStack>
       </Box>
@@ -282,20 +247,29 @@ const MobileNav = memo(({ menuItems, isOpen }) => {
 MobileNav.displayName = 'MobileNav';
 
 const Nav = () => {
-  const { isOpen, onToggle } = useDisclosure();
+  const { isOpen, onToggle, onClose } = useDisclosure();
   const { colorMode, toggleColorMode } = useColorMode();
   const { openSearch } = useSearchStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [userId, setUserId] = useState('guest');
   const [accessToken, setAccessToken] = useState(null);
+  const [atTop, setAtTop] = useState(true);
   const toast = useToast();
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setAtTop(window.scrollY === 0);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
-  const hoverBg = useColorModeValue('gray.100', 'gray.700');
-  const activeColor = useColorModeValue('blue.600', 'blue.200');
-  const textColor = useColorModeValue('gray.600', 'gray.200');
+  const activeColor = useColorModeValue('blue.600', 'blue.300');
+  const textColor = useColorModeValue('gray.700', 'gray.200');
+  const hoverColor = useColorModeValue('blue.800', 'blue.200');
 
   const handleToggleColorMode = useCallback(() => {
     toggleColorMode();
@@ -477,12 +451,15 @@ const Nav = () => {
     navigate('/');
   }, [accessToken, userId, navigate]);
 
+  const handleHistory = useCallback(() => {
+    navigate(`/u/${userId}`);
+  }, [navigate, userId]);
+
   const menuItems = React.useMemo(() => [
     { name: 'Trang chủ', path: '/' },
     { name: 'Categories', path: '/categories' },
     { name: 'About', path: '/about' },
     { name: 'Contact', path: '/contact' },
-    { name: 'Lịch sử', path: `/u/${userId}` },
   ], [userId]);
 
   const isActive = useCallback((path) => {
@@ -497,12 +474,13 @@ const Nav = () => {
       position="sticky"
       top={0}
       zIndex={1000}
-      bg={bgColor}
-      borderBottom={1}
-      borderStyle="solid"
-      borderColor={borderColor}
-      backdropFilter="blur(10px)"
-      webkitbackdropfilter="blur(10px)"
+      bg={atTop ? 'transparent' : useColorModeValue('rgba(255, 255, 255, 0.8)', 'rgba(26, 32, 44, 0.8)')}
+      borderBottom={atTop ? 'none' : 1}
+      borderStyle={atTop ? 'none' : 'solid'}
+      borderColor={atTop ? 'transparent' : borderColor}
+      backdropFilter={atTop ? 'none' : 'blur(12px)'}
+      webkitbackdropfilter={atTop ? 'none' : 'blur(12px)'}
+      transition="all 0.3s ease"
     >
       <Flex
         bg="transparent"
@@ -512,12 +490,14 @@ const Nav = () => {
         px={{ base: 2, md: 4 }}
         align={'center'}
         maxW="100%"
+        position="relative"
       >
         <Flex
           flex={{ base: 'initial', md: 'auto' }}
           ml={{ base: -2 }}
           display={{ base: 'flex', md: 'none' }}
           align="center"
+          zIndex={1001}
         >
           <IconButton
             onClick={onToggle}
@@ -536,17 +516,31 @@ const Nav = () => {
           <NavLogo />
         </Box>
 
-        <Flex flex={1} justify="center" align="center" minW={0} position="relative">
-          <NavMenuDesktop
-            menuItems={menuItems}
-            isActive={isActive}
-            hoverBg={hoverBg}
-            activeColor={activeColor}
-            textColor={textColor}
-          />
+        <Flex
+          flex={1}
+          align="center"
+          minW={0}
+          position="relative"
+        >
+          <Box
+            display={{ base: 'none', md: 'block' }}
+            position="absolute"
+            left={0}
+            right={0}
+            mx="auto"
+            width="fit-content"
+          >
+            <DesktopNav
+              menuItems={menuItems}
+              isActive={isActive}
+              activeColor={activeColor}
+              textColor={textColor}
+              hoverColor={hoverColor}
+            />
+          </Box>
         </Flex>
 
-        <Box flex="0 0 auto">
+        <Box flex="0 0 auto" zIndex={1001}>
           <NavActions
             colorMode={colorMode}
             handleToggleColorMode={handleToggleColorMode}
@@ -554,11 +548,23 @@ const Nav = () => {
             accessToken={accessToken}
             onLogin={handleLogin}
             onLogout={handleLogout}
+            onHistory={handleHistory}
+            userId={userId}
           />
         </Box>
       </Flex>
 
-      <NavMenuMobile menuItems={menuItems} isOpen={isOpen} />
+      <Box display={{ base: 'block', md: 'none' }}>
+        <MobileNav
+          menuItems={menuItems}
+          isOpen={isOpen}
+          isActive={isActive}
+          activeColor={activeColor}
+          textColor={textColor}
+          hoverColor={hoverColor}
+          onNavigate={onClose}
+        />
+      </Box>
       <SearchModal />
     </Box>
   );

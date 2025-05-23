@@ -5,6 +5,7 @@ import { LockIcon, RepeatIcon, DownloadIcon, DeleteIcon } from '@chakra-ui/icons
 import { backupUserData, restoreUserData, deleteUserData } from '../components/GoogleDriveLogin';
 import HistoryCard from '../components/History/HistoryCard';
 import { READ_KEY, FOLLOW_KEY, MANGA_KEY, LAST_SYNC_KEY, getHistoryData, saveHistoryData, shouldSync } from '../utils/historyUtils';
+import Pagination from '../components/HomePage/Pagination';
 
 // Update the grid sections to use VStack instead
 const LoadingSkeleton = () => (
@@ -34,6 +35,12 @@ function UserHistoryPage() {
   const cardBg = useColorModeValue('white', 'gray.800');
   const textColor = useColorModeValue('gray.700', 'white');
   const mutedTextColor = useColorModeValue('gray.500', 'gray.400');
+
+  // Pagination state
+  const PAGE_SIZE = 9;
+  const [readPage, setReadPage] = useState(1);
+  const [followPage, setFollowPage] = useState(1);
+  const [bookmarkPage, setBookmarkPage] = useState(1);
 
   // Function to merge arrays of objects by id
   const mergeArrays = (localArray, driveArray, timestampKey) => {
@@ -354,20 +361,28 @@ function UserHistoryPage() {
               {loading ? (
                 <LoadingSkeleton />
               ) : readPosts.length > 0 ? (
-                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
-                  {readPosts.map((post) => (
-                    <GridItem key={`read_${post.id}`}>
-                      <HistoryCard
-                        post={post}
-                        timestamp={post.readAt}
-                        timestampLabel="Đọc lúc"
-                        bg={cardBg}
-                        textColor={textColor}
-                        mutedTextColor={mutedTextColor}
-                      />
-                    </GridItem>
-                  ))}
-                </SimpleGrid>
+                <>
+                  <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
+                    {readPosts.slice((readPage-1)*PAGE_SIZE, readPage*PAGE_SIZE).map((post) => (
+                      <GridItem key={`read_${post.id}`}>
+                        <HistoryCard
+                          post={post}
+                          timestamp={post.readAt}
+                          timestampLabel="Đọc lúc"
+                          bg={cardBg}
+                          textColor={textColor}
+                          mutedTextColor={mutedTextColor}
+                        />
+                      </GridItem>
+                    ))}
+                  </SimpleGrid>
+                  <Pagination
+                    currentPage={readPage}
+                    totalPages={Math.ceil(readPosts.length / PAGE_SIZE)}
+                    onPageChange={setReadPage}
+                    mutedTextColor={mutedTextColor}
+                  />
+                </>
               ) : (
                 <Text color={mutedTextColor} textAlign="center" py={8}>
                   Chưa có bài viết nào được đọc
@@ -379,20 +394,28 @@ function UserHistoryPage() {
               {loading ? (
                 <LoadingSkeleton />
               ) : followPosts.length > 0 ? (
-                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
-                  {followPosts.map((post) => (
-                    <GridItem key={`follow_${post.id}`}>
-                      <HistoryCard
-                        post={post}
-                        timestamp={post.followAt}
-                        timestampLabel="Theo dõi lúc"
-                        bg={cardBg}
-                        textColor={textColor}
-                        mutedTextColor={mutedTextColor}
-                      />
-                    </GridItem>
-                  ))}
-                </SimpleGrid>
+                <>
+                  <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
+                    {followPosts.slice((followPage-1)*PAGE_SIZE, followPage*PAGE_SIZE).map((post) => (
+                      <GridItem key={`follow_${post.id}`}>
+                        <HistoryCard
+                          post={post}
+                          timestamp={post.followAt}
+                          timestampLabel="Theo dõi lúc"
+                          bg={cardBg}
+                          textColor={textColor}
+                          mutedTextColor={mutedTextColor}
+                        />
+                      </GridItem>
+                    ))}
+                  </SimpleGrid>
+                  <Pagination
+                    currentPage={followPage}
+                    totalPages={Math.ceil(followPosts.length / PAGE_SIZE)}
+                    onPageChange={setFollowPage}
+                    mutedTextColor={mutedTextColor}
+                  />
+                </>
               ) : (
                 <Text color={mutedTextColor} textAlign="center" py={8}>
                   Chưa có bài viết nào được theo dõi
@@ -404,22 +427,30 @@ function UserHistoryPage() {
               {loading ? (
                 <LoadingSkeleton />
               ) : mangaBookmarks.length > 0 ? (
-                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
-                  {mangaBookmarks.map((bookmark) => (
-                    <GridItem key={`bookmark_${bookmark.id}_${bookmark.currentPage}`}>
-                      <HistoryCard
-                        post={bookmark}
-                        timestamp={bookmark.timestamp}
-                        timestampLabel="Đánh dấu lúc"
-                        currentPage={bookmark.currentPage}
-                        totalPages={bookmark.totalPages}
-                        bg={cardBg}
-                        textColor={textColor}
-                        mutedTextColor={mutedTextColor}
-                      />
-                    </GridItem>
-                  ))}
-                </SimpleGrid>
+                <>
+                  <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
+                    {mangaBookmarks.slice((bookmarkPage-1)*PAGE_SIZE, bookmarkPage*PAGE_SIZE).map((bookmark) => (
+                      <GridItem key={`bookmark_${bookmark.id}_${bookmark.currentPage}`}>
+                        <HistoryCard
+                          post={bookmark}
+                          timestamp={bookmark.timestamp}
+                          timestampLabel="Đánh dấu lúc"
+                          currentPage={bookmark.currentPage}
+                          totalPages={bookmark.totalPages}
+                          bg={cardBg}
+                          textColor={textColor}
+                          mutedTextColor={mutedTextColor}
+                        />
+                      </GridItem>
+                    ))}
+                  </SimpleGrid>
+                  <Pagination
+                    currentPage={bookmarkPage}
+                    totalPages={Math.ceil(mangaBookmarks.length / PAGE_SIZE)}
+                    onPageChange={setBookmarkPage}
+                    mutedTextColor={mutedTextColor}
+                  />
+                </>
               ) : (
                 <Text color={mutedTextColor} textAlign="center" py={8}>
                   Chưa có manga nào được đánh dấu
