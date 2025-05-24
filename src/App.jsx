@@ -4,6 +4,7 @@ import { ChakraProvider, Box } from '@chakra-ui/react';
 import { Global } from '@emotion/react';
 import Nav from './components/Nav';
 import ContentWithTransitions from './components/ContentWithTransitions';
+import Footer from './components/Footer';
 import theme from './theme';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
@@ -28,10 +29,9 @@ function App() {
           `}
         />
         <Router>
-          <Box minH="100vh" className="dark-mode theme-transition">
             <Nav />
             <ContentWithTransitions />
-          </Box>
+            <Footer />
         </Router>
       </ChakraProvider>
     </GoogleOAuthProvider>

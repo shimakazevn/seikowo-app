@@ -209,11 +209,11 @@ const TagsList = () => {
         }}
         px={10}
       >
-        <HStack spacing={3}>
+        <HStack spacing={4}>
           {tags.map((tag, index) => (
             <Tag
               key={tag.name}
-              size="md"
+              size="lg"
               borderRadius="full"
               variant="subtle"
               bgGradient={gradients[index % gradients.length]}
@@ -221,14 +221,15 @@ const TagsList = () => {
               transition="all 0.2s"
               cursor="pointer"
               position="relative"
-              my="1"
-              px={4}
+              my="2"
+              px={6}
+              py={2}
               onClick={() => setSelectedTag(selectedTag === tag.name ? null : tag.name)}
               opacity={selectedTag && selectedTag !== tag.name ? 0.6 : 1}
-              transform={selectedTag === tag.name ? 'scale(1.03)' : 'scale(1)'}
+              transform={selectedTag === tag.name ? 'scale(1.05)' : 'scale(1)'}
             >
               <TagLabel
-                fontSize="sm"
+                fontSize="md"
                 fontWeight="medium"
                 pr="1.35rem"
                 textTransform="uppercase"
@@ -240,11 +241,11 @@ const TagsList = () => {
                 display="block"
                 alignItems="center"
                 justifyContent="center"
-                px="6px"
-                py="3px"
+                px="8px"
+                py="4px"
                 borderRadius="full"
                 bg="whiteAlpha.400"
-                fontSize="xs"
+                fontSize="sm"
                 lineHeight="1.5"
                 fontWeight="small"
                 position="absolute"

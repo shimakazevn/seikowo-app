@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { blogConfig } from '../config';
+import { fetchPosts } from '../api';
 
 // Helper: strip HTML and normalize text
 function normalizeText(str) {
@@ -72,15 +73,7 @@ const useSearchStore = create((set, get) => ({
         posts = JSON.parse(cachedPosts);
       } else {
         // If no cached data or cache is old, fetch from API
-        const response = await fetch(
-          `https://www.googleapis.com/blogger/v3/blogs/${blogConfig.blogId}/posts?key=${blogConfig.apiKey}&maxResults=500`
-        );
-        
-        if (!response.ok) {
-          throw new Error(`API Error: ${response.status}`);
-        }
-
-        const data = await response.json();
+        const data = await fetchPosts();
         posts = data.items || [];
         
         // Cache the fetched data

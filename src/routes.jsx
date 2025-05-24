@@ -8,6 +8,9 @@ const TagsList = lazy(() => import('./pages/TagList'));
 const PostsByTag = lazy(() => import('./pages/PostsByTag'));
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const PagesList = lazy(() => import('./pages/PagesList'));
+const CategoriesPage = lazy(() => import('./pages/CategoriesPage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
 
 export const routes = [
   {
@@ -41,6 +44,18 @@ export const routes = [
   {
     path: '/u/:userId',
     element: <UserHistoryPage />,
+  },
+  {
+    path: '/categories',
+    element: <CategoriesPage />,
+  },
+  {
+    path: '/about',
+    element: <AboutPage />,
+  },
+  {
+    path: '/contact',
+    element: <ContactPage />,
   },
 ];
 

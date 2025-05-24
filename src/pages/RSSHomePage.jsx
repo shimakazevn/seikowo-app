@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { fetchRSSFeed } from '../api';
 
 // Đổi đường dẫn RSS tại đây cho blog bạn
 const BLOG_RSS_URL = 'https://seikowoteam.blogspot.com/feeds/posts/default?alt=rss';
@@ -11,9 +12,9 @@ function RSSHomePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(RSS_PROXY)
-      .then(res => res.json())
-      .then(data => {
+    const loadRSSFeed = async () => {
+      try {
+        const data = await fetchRSSFeed();
         const postsData = data.items.map((item) => ({
           title: item.title,
           link: item.link,
@@ -21,12 +22,14 @@ function RSSHomePage() {
           content: item.content,
         }));
         setPosts(postsData);
-        setLoading(false);
-      })
-      .catch(err => {
+      } catch (err) {
         console.error("Lỗi khi tải RSS feed:", err);
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    loadRSSFeed();
   }, []);
 
   if (loading) return <div className="text-center my-5">Đang tải dữ liệu...</div>;

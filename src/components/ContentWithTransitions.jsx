@@ -4,7 +4,14 @@ import { Box } from '@chakra-ui/react';
 import HomePage from '../pages/HomePage';
 import PostPage from '../pages/PostPage';
 import TagPage from './TagPage/TagPage';
-import UserHistoryPage from '../pages/HistoryPage';
+import BookmarkPage from '../pages/BookmarkPage';
+import CategoriesPage from '../pages/CategoriesPage';
+import AboutPage from '../pages/AboutPage';
+import ContactPage from '../pages/ContactPage';
+import UserProfilePage from '../pages/UserProfilePage';
+import FavoritePage from './Favorite/FavoritePage';
+import PrivacyPolicy from '../pages/PrivacyPolicy';
+import TermsOfService from '../pages/TermsOfService';
 import { AnimatePresence, motion } from 'framer-motion';
 
 // Memoize static pages
@@ -20,7 +27,7 @@ const ContentWithTransitions = () => {
   const location = useLocation();
   
   return (
-    <Box minH="calc(100vh - 5rem)">
+    <Box minH="calc(100vh - 9rem)">
       <AnimatePresence mode="wait">
         <motion.div
           key={location.pathname}
@@ -32,44 +39,19 @@ const ContentWithTransitions = () => {
           <Routes location={location} key={location.pathname}>
             <Route path="/" element={<HomePage />} />
             <Route path="/tag/:tagName" element={<TagPage />} />
-            <Route path="/u/:userId" element={<UserHistoryPage />} />
-            <Route 
-              path="/categories" 
-              element={
-                <StaticPage>
-                  <h1>Categories</h1>
-                </StaticPage>
-              } 
-            />
+            <Route path="/bookmarks" element={<BookmarkPage />} />
+            <Route path="/categories" element={<CategoriesPage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/profile" element={<UserProfilePage />} />
+            <Route path="/favorite" element={<FavoritePage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
             <Route 
               path="/search" 
               element={
                 <StaticPage>
                   <h1>Search</h1>
-                </StaticPage>
-              } 
-            />
-            <Route 
-              path="/about" 
-              element={
-                <StaticPage>
-                  <h1>About</h1>
-                </StaticPage>
-              } 
-            />
-            <Route 
-              path="/contact" 
-              element={
-                <StaticPage>
-                  <h1>Contact</h1>
-                </StaticPage>
-              } 
-            />
-            <Route 
-              path="/terms" 
-              element={
-                <StaticPage>
-                  <h1>Terms</h1>
                 </StaticPage>
               } 
             />

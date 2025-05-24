@@ -12,10 +12,10 @@ export const optimizeThumbnail = (url, size = 600) => {
     try {
       // Check if URL has /s{size}/ pattern
       const hasSizeInPath = /\/s\d+\//.test(url);
-      
+      let optimizedUrl;
       if (hasSizeInPath) {
         // If URL has /s{size}/, update the size
-        return url.replace(/\/s\d+\//, `/s${size}/`);
+        optimizedUrl = url.replace(/\/s\d+\//, `/s${size}/`);
       } else {
         // If URL doesn't have /s{size}/, add =s{size}
         // First remove any existing =s parameter if exists
@@ -23,8 +23,10 @@ export const optimizeThumbnail = (url, size = 600) => {
         if (cleanUrl.includes('=s')) {
           cleanUrl = cleanUrl.split('=')[0];
         }
-        return `${cleanUrl}=s${size}`;
+        optimizedUrl = `${cleanUrl}=s${size}`;
       }
+      // Đổi đuôi sang webp nếu có thể
+      return convertToWebpUrl(optimizedUrl);
     } catch (error) {
       console.error('Error processing Blogger image URL:', error);
       return url;
@@ -33,10 +35,12 @@ export const optimizeThumbnail = (url, size = 600) => {
 
   // Handle other image hosting services if needed
   if (url.includes('i.imgur.com')) {
-    return url.replace(/(\.[^.]+)$/, `m$1`); // medium thumbnail
+    const optimizedUrl = url.replace(/(\.[^.]+)$/, `m$1`); // medium thumbnail
+    return convertToWebpUrl(optimizedUrl);
   }
 
-  return url;
+  // Đổi đuôi sang webp nếu có thể cho các trường hợp còn lại
+  return convertToWebpUrl(url);
 };
 
 // URL handling
@@ -94,4 +98,11 @@ export const getThumbnailBySlug = (posts, targetSlug) => {
   }
 
   return null;
+};
+
+// Chuyển đuôi ảnh sang .webp nếu có thể
+export const convertToWebpUrl = (url) => {
+  if (!url) return url;
+  // Chỉ đổi nếu là jpg, jpeg, png
+  return url.replace(/\.(jpg|jpeg|png)(\?.*)?$/i, '.webp$2');
 }; 

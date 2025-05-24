@@ -22,9 +22,21 @@ import {
   useColorModeValue,
   AspectRatio,
   useToast,
+  useDisclosure,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalCloseButton,
 } from '@chakra-ui/react';
 import { ArrowBackIcon, StarIcon } from '@chakra-ui/icons';
 import { getSlugFromUrl } from '../utils/blogUtils';
+import { loadPost } from '../utils/indexedDBUtils';
+import useUserStore from '../store/useUserStore';
+import { FOLLOW_KEY } from '../utils/userUtils';
+import { isFollowed, saveFollow, removeFollow } from '../utils/historyUtils';
+import { backupUserData } from '../api/auth';
 
 const CACHE_DURATION = 3600000; // 1 hour in milliseconds
 const CACHE_KEY = "cachedPosts";
@@ -61,7 +73,30 @@ const PostContent = ({ post }) => {
   const [mangaImages, setMangaImages] = useState([]);
   const [isMangaPost, setIsMangaPost] = useState(false);
   const toast = useToast();
-  const [followed, setFollowed] = useState(isFollowed(post));
+  const { userId, accessToken, isGuest } = useUserStore();
+  const [followed, setFollowed] = useState(false);
+
+  // Debug log để kiểm tra trạng thái đăng nhập
+  useEffect(() => {
+    console.log('Login state:', { userId, accessToken, isGuest });
+  }, [userId, accessToken, isGuest]);
+
+  useEffect(() => {
+    const checkFollowStatus = async () => {
+      if (isGuest || !userId) {
+        setFollowed(false);
+        return;
+      }
+      try {
+        const isFollowedStatus = await isFollowed(post, userId);
+        setFollowed(isFollowedStatus);
+      } catch (error) {
+        console.error('Error checking follow status:', error);
+        setFollowed(false);
+      }
+    };
+    checkFollowStatus();
+  }, [post, isGuest, userId]);
 
   useEffect(() => {
     if (contentRef.current) {
@@ -86,8 +121,8 @@ const PostContent = ({ post }) => {
       const shouldUseMangaReader = (
         // Has manga or doujinshi tag
         hasMangaTags ||
-        // OR doesn't have anime tag AND has more than 10 separators
-        (!hasAnimeTag && separatorCount >= 10)
+        // OR doesn't have anime tag AND has more than 5 separators
+        (!hasAnimeTag && separatorCount >= 5)
       );
 
       if (shouldUseMangaReader && separatorCount > 0) {
@@ -105,8 +140,6 @@ const PostContent = ({ post }) => {
       }
     }
   }, [post.content, post.labels]);
-
-  useEffect(() => { setFollowed(isFollowed(post)); }, [post]);
 
   // Function to process HTML content and replace img tags with LazyLoadImage
   const processContent = (content) => {
@@ -156,138 +189,193 @@ const PostContent = ({ post }) => {
     return div.innerHTML;
   };
   
+  const handleFollowClick = async () => {
+    // Debug log để kiểm tra trạng thái khi click
+    console.log('Follow click state:', { userId, accessToken, isGuest });
+
+    if (!userId || !accessToken) {
+      toast({
+        title: 'Yêu cầu đăng nhập',
+        description: 'Vui lòng đăng nhập để sử dụng tính năng này.',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    try {
+      if (followed) {
+        await removeFollow(post, userId);
+        setFollowed(false);
+        toast({ 
+          title: 'Đã bỏ follow', 
+          status: 'info',
+          duration: 2000,
+          isClosable: true 
+        });
+      } else {
+        await saveFollow(post, userId);
+        setFollowed(true);
+        toast({ 
+          title: 'Đã follow bài viết', 
+          status: 'success',
+          duration: 2000,
+          isClosable: true 
+        });
+      }
+
+      // Backup to Google Drive
+      try {
+        const followPosts = await getHistoryData('favorites', userId);
+        const readPosts = await getHistoryData('read', userId);
+        const mangaBookmarks = await getHistoryData('bookmarks', userId);
+        
+        await backupUserData(accessToken, userId, {
+          readPosts,
+          followPosts,
+          mangaBookmarks
+        });
+      } catch (error) {
+        console.error('Error backing up to Google Drive:', error);
+        // Don't show error toast to user as this is a background operation
+      }
+    } catch (error) {
+      console.error('Error handling follow:', error);
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể xử lý yêu cầu follow.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
   return (
-    <Box bg={bgColor} p={8} rounded="lg" shadow="lg" fontSize={{ base: "md", md: "lg" }} width="100%">
-      <Heading 
-        as="h1" 
-        fontSize={{ base: "20px", sm: "22px", md: "24px", lg: "26px" }}
-        mb={6}
-        lineHeight="1.4"
-      >
-        {post.title}
-      </Heading>
-      <HStack spacing={4} mb={8} color={useColorModeValue('gray.600', 'gray.400')}>
-        <Text fontSize={{ base: "sm", md: "md" }}>
-          Đăng ngày: {new Date(post.published).toLocaleDateString('vi-VN', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-          })}
-        </Text>
-        <Button
-          size="sm"
-          colorScheme={followed ? 'red' : 'blue'}
-          variant={followed ? 'outline' : 'solid'}
-          onClick={() => {
-            if (followed) {
-              removeFollow(post);
-              setFollowed(false);
-              toast({ title: 'Đã bỏ follow', status: 'info' });
-            } else {
-              saveFollow(post);
-              setFollowed(true);
-              toast({ title: 'Đã follow bài viết', status: 'success' });
-            }
-          }}
-          leftIcon={<StarIcon />}
+    <>
+      <Box bg={bgColor} p={8} rounded="lg" shadow="lg" fontSize={{ base: "md", md: "lg" }} width="100%">
+        <Heading 
+          as="h1" 
+          fontSize={{ base: "20px", sm: "22px", md: "24px", lg: "26px" }}
+          mb={6}
+          lineHeight="1.4"
         >
-          {followed ? 'Bỏ follow' : 'Follow'}
+          {post.title}
+        </Heading>
+        <HStack spacing={4} mb={8} color={useColorModeValue('gray.600', 'gray.400')}>
+          <Text fontSize={{ base: "sm", md: "md" }}>
+            Đăng ngày: {new Date(post.published).toLocaleDateString('vi-VN', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            })}
+          </Text>
+          <Button
+            size="sm"
+            colorScheme={followed ? 'red' : 'blue'}
+            variant={followed ? 'outline' : 'solid'}
+            onClick={handleFollowClick}
+            leftIcon={<StarIcon />}
+          >
+            {followed ? 'Bỏ follow' : 'Follow'}
+          </Button>
+        </HStack>
+
+        {isMangaPost ? (
+          <MangaReader images={mangaImages} postId={post.id} postTitle={post.title} postSlug={getSlugFromUrl(post.url)} />
+        ) : (
+          <Box
+            ref={contentRef}
+            className="post-content"
+            sx={{
+              '.lazy-load-image': {
+                maxWidth: '100%',
+                height: 'auto',
+                borderRadius: 'lg',
+                margin: '1.5rem auto',
+                display: 'block',
+                boxShadow: 'lg',
+              },
+              '.lazy-load-image-wrapper': {
+                transition: 'opacity 0.15s ease-in-out !important'
+              },
+              '.iframe-wrapper': {
+                position: 'relative',
+                paddingBottom: '56.25%',
+                height: '0',
+                overflow: 'hidden',
+                maxWidth: '100%',
+                margin: '1.5rem auto',
+                borderRadius: 'lg',
+                boxShadow: 'lg',
+                background: 'gray.100',
+                _dark: {
+                  background: 'gray.700'
+                }
+              },
+              'iframe': {
+                border: 'none',
+                borderRadius: 'lg',
+              },
+              'p': {
+                mb: { base: 4, md: 6 },
+                lineHeight: { base: 1.6, md: 1.8 },
+                fontSize: { base: 'md', md: 'lg' },
+              },
+              'h2, h3, h4': {
+                mt: { base: 6, md: 8 },
+                mb: { base: 3, md: 4 },
+                fontWeight: '600',
+                lineHeight: '1.4',
+                fontSize: { 
+                  h2: { base: '18px', sm: '19px', md: '20px', lg: '22px' },
+                  h3: { base: '17px', sm: '18px', md: '19px', lg: '20px' },
+                  h4: { base: '16px', sm: '17px', md: '18px', lg: '19px' }
+                }
+              },
+              'ul, ol': {
+                paddingLeft: { base: 4, md: 6 },
+                mb: { base: 4, md: 6 },
+                fontSize: { base: 'md', md: 'lg' },
+              },
+              'li': {
+                mb: { base: 1.5, md: 2 },
+              },
+              'blockquote': {
+                borderLeft: '4px solid',
+                borderColor: 'gray.200',
+                pl: { base: 3, md: 4 },
+                py: { base: 1.5, md: 2 },
+                my: { base: 3, md: 4 },
+                fontStyle: 'italic',
+                fontSize: { base: 'md', md: 'lg' },
+              },
+              'a': {
+                color: 'blue.500',
+                textDecoration: 'underline',
+                _hover: {
+                  color: 'blue.600',
+                }
+              }
+            }}
+            dangerouslySetInnerHTML={{ __html: processContent(post.content) }}
+          />
+        )}
+
+        <Button
+          leftIcon={<ArrowBackIcon />}
+          mt={{ base: 6, md: 8 }}
+          as={Link}
+          to="/"
+          colorScheme="blue"
+          variant="outline"
+          size={{ base: "md", md: "lg" }}
+        >
+          Quay lại trang chủ
         </Button>
-      </HStack>
-
-      {isMangaPost ? (
-        <MangaReader images={mangaImages} postId={post.id} postTitle={post.title} postSlug={getSlugFromUrl(post.url)} />
-      ) : (
-        <Box
-          ref={contentRef}
-          className="post-content"
-          sx={{
-            '.lazy-load-image': {
-              maxWidth: '100%',
-              height: 'auto',
-              borderRadius: 'lg',
-              margin: '1.5rem auto',
-              display: 'block',
-              boxShadow: 'lg',
-            },
-            '.lazy-load-image-wrapper': {
-              transition: 'opacity 0.15s ease-in-out !important'
-            },
-            '.iframe-wrapper': {
-              position: 'relative',
-              paddingBottom: '56.25%',
-              height: '0',
-              overflow: 'hidden',
-              maxWidth: '100%',
-              margin: '1.5rem auto',
-              borderRadius: 'lg',
-              boxShadow: 'lg',
-              background: 'gray.100',
-              _dark: {
-                background: 'gray.700'
-              }
-            },
-            'iframe': {
-              border: 'none',
-              borderRadius: 'lg',
-            },
-            'p': {
-              mb: { base: 4, md: 6 },
-              lineHeight: { base: 1.6, md: 1.8 },
-              fontSize: { base: 'md', md: 'lg' },
-            },
-            'h2, h3, h4': {
-              mt: { base: 6, md: 8 },
-              mb: { base: 3, md: 4 },
-              fontWeight: '600',
-              lineHeight: '1.4',
-              fontSize: { 
-                h2: { base: '18px', sm: '19px', md: '20px', lg: '22px' },
-                h3: { base: '17px', sm: '18px', md: '19px', lg: '20px' },
-                h4: { base: '16px', sm: '17px', md: '18px', lg: '19px' }
-              }
-            },
-            'ul, ol': {
-              paddingLeft: { base: 4, md: 6 },
-              mb: { base: 4, md: 6 },
-              fontSize: { base: 'md', md: 'lg' },
-            },
-            'li': {
-              mb: { base: 1.5, md: 2 },
-            },
-            'blockquote': {
-              borderLeft: '4px solid',
-              borderColor: 'gray.200',
-              pl: { base: 3, md: 4 },
-              py: { base: 1.5, md: 2 },
-              my: { base: 3, md: 4 },
-              fontStyle: 'italic',
-              fontSize: { base: 'md', md: 'lg' },
-            },
-            'a': {
-              color: 'blue.500',
-              textDecoration: 'underline',
-              _hover: {
-                color: 'blue.600',
-              }
-            }
-          }}
-          dangerouslySetInnerHTML={{ __html: processContent(post.content) }}
-        />
-      )}
-
-      <Button
-        leftIcon={<ArrowBackIcon />}
-        mt={{ base: 6, md: 8 }}
-        as={Link}
-        to="/"
-        colorScheme="blue"
-        variant="outline"
-        size={{ base: "md", md: "lg" }}
-      >
-        Quay lại trang chủ
-      </Button>
-    </Box>
+      </Box>
+    </>
   );
 };
 
@@ -353,166 +441,30 @@ const NotFoundAlert = () => (
   </Alert>
 );
 
-function saveReadHistory(post) {
-  if (!post) return;
-  const userId = localStorage.getItem('google_user_id') || 'guest';
-  const key = `history_read_posts_${userId}`;
-  const slug = getSlugFromUrl(post.url);
-  const entry = {
-    id: post.id,
-    title: post.title,
-    slug,
-    readAt: Date.now(),
-  };
-
-  let arr = [];
-  try {
-    arr = JSON.parse(localStorage.getItem(key) || '[]');
-  } catch (err) {
-    // Ignore error and start with empty array
-  }
-
-  arr = arr.filter(item => item.id !== post.id);
-  arr.unshift(entry);
-  if (arr.length > 100) arr = arr.slice(0, 100);
-
-  try {
-    localStorage.setItem(key, JSON.stringify(arr));
-  } catch (err) {
-    // Ignore error if storage is full
-  }
-}
-
-function saveFollow(post) {
-  if (!post) return;
-  const userId = localStorage.getItem('google_user_id') || 'guest';
-  const key = `history_follow_posts_${userId}`;
-  const slug = getSlugFromUrl(post.url);
-  const entry = {
-    id: post.id,
-    title: post.title,
-    slug,
-    followAt: Date.now(),
-  };
-  let arr = [];
-  try {
-    arr = JSON.parse(localStorage.getItem(key) || '[]');
-  } catch {}
-  arr = arr.filter(item => item.id !== post.id);
-  arr.unshift(entry);
-  if (arr.length > 100) arr = arr.slice(0, 100);
-  localStorage.setItem(key, JSON.stringify(arr));
-}
-
-function removeFollow(post) {
-  if (!post) return;
-  const userId = localStorage.getItem('google_user_id') || 'guest';
-  const key = `history_follow_posts_${userId}`;
-  let arr = [];
-  try {
-    arr = JSON.parse(localStorage.getItem(key) || '[]');
-  } catch {}
-  arr = arr.filter(item => item.id !== post.id);
-  localStorage.setItem(key, JSON.stringify(arr));
-}
-
-function isFollowed(post) {
-  if (!post) return false;
-  const userId = localStorage.getItem('google_user_id') || 'guest';
-  const key = `history_follow_posts_${userId}`;
-  let arr = [];
-  try {
-    arr = JSON.parse(localStorage.getItem(key) || '[]');
-  } catch {}
-  return arr.some(item => item.id === post.id);
-}
-
 function PostPage() {
-  const { '*': fullPath } = useParams();
+  const { '*' : fullPath } = useParams();
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchPosts = async () => {
-      if (!fullPath) {
-        setError('Invalid URL');
-        setLoading(false);
-        return;
-      }
-
+    const fetchData = async () => {
       setLoading(true);
       setError(null);
-
       try {
-        // Try to get data from cache first
-        const cachedData = localStorage.getItem(CACHE_KEY);
-        const cacheTime = localStorage.getItem(CACHE_KEY + '_time');
-        const now = Date.now();
-
-        // Check if cache is valid
-        if (cachedData && cacheTime && (now - parseInt(cacheTime) < CACHE_DURATION)) {
-          try {
-            const posts = JSON.parse(cachedData);
-            const found = posts?.find(p => {
-              const postPath = normalizeUrl(p.url);
-              const requestPath = normalizeUrl('/' + fullPath);
-              return postPath === requestPath;
-            });
-
-            if (found) {
-              setPost(found);
-              setLoading(false);
-              return;
-            }
-          } catch (cacheError) {
-            console.warn('Cache parsing error:', cacheError);
-            localStorage.removeItem(CACHE_KEY);
-            localStorage.removeItem(CACHE_KEY + '_time');
-          }
-        }
-
-        // Fetch from API if cache is invalid or post not found in cache
-        const res = await fetch(
-          `https://www.googleapis.com/blogger/v3/blogs/${blogConfig.blogId}/posts?key=${blogConfig.apiKey}&maxResults=500`
-        );
-
-        if (!res.ok) {
-          throw new Error(`HTTP Error: ${res.status}`);
-        }
-
-        const data = await res.json();
-        const posts = data.items || [];
-
-        // Save to cache
-        localStorage.setItem(CACHE_KEY, JSON.stringify(posts));
-        localStorage.setItem(CACHE_KEY + '_time', now.toString());
-
-        // Find the requested post using the full path
-        const found = posts.find(p => {
-          const postPath = normalizeUrl(p.url);
-          const requestPath = normalizeUrl('/' + fullPath);
-          return postPath === requestPath;
-        });
-
-        setPost(found || null);
-
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        setError(error.message);
+        const found = await loadPost(fullPath);
+        setPost(found);
+        if (!found) setError('Không tìm thấy bài viết');
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setError(err.message || 'Lỗi khi tải bài viết');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPosts();
+    fetchData();
   }, [fullPath]);
-
-  useEffect(() => {
-    if (post) {
-      saveReadHistory(post);
-    }
-  }, [post]);
 
   // Update document title when post is loaded
   useEffect(() => {
@@ -526,9 +478,6 @@ function PostPage() {
       document.title = blogConfig.title || 'Blog';
     };
   }, [post]);
-
-  // Lấy userId từ localStorage (hoặc context), nếu chưa có thì 'guest'
-  const userId = localStorage.getItem('google_user_id') || 'guest';
 
   return (
     <PageTransition>

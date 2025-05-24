@@ -219,3 +219,24 @@ display: block;
 box-sizing: border-box;
 }
 }
+
+body {
+  background: #181A1B !important;
+  color: #E0E0E0;
+  font-family: 'Inter', 'Roboto', Arial, sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  background: #23272A;
+}
+::-webkit-scrollbar-thumb {
+  background: #393E46;
+  border-radius: 8px;
+}
+
+.card, .chakra-card, .chakra-box {
+  background: #23272A !important;
+  border-radius: 18px !important;
+  box-shadow: 0 4px 24px 0 rgba(0,0,0,0.25) !important;
+}

@@ -1,9 +1,8 @@
 import {create} from 'zustand';
 import axios from 'axios';
 import { blogConfig } from '../config'; // Import blogConfig
+import { getPostsFromDB, savePostsToDB, clearPostsFromDB } from '../utils/indexedDBUtils';
 
-const CACHE_KEY = 'cachedPosts';
-const CACHE_TIME_KEY = 'cacheTime';
 const CACHE_EXPIRATION = 10 * 60 * 1000; // 10 minutes
 
 const useBlogStore = create((set, get) => ({
@@ -12,6 +11,7 @@ const useBlogStore = create((set, get) => ({
   error: null,
   lastRefreshTime: 0,
   selectedTag: null,
+  nextPageToken: null,
 
   setSelectedTag: (tag) => set({ selectedTag: tag }),
 
@@ -23,44 +23,77 @@ const useBlogStore = create((set, get) => ({
     );
   },
 
-  fetchPosts: async (forceRefresh = false) => {
+  fetchPosts: async (params = {}) => {
+    const { forceRefresh = false, pageToken, orderBy = 'published', view = 'READER', maxResults = 100 } = params;
     set({ loading: true, error: null });
 
-    const cachedData = localStorage.getItem(CACHE_KEY);
-    const cacheTime = localStorage.getItem(CACHE_TIME_KEY);
+    // Cache key based on orderBy
+    const cacheKey = `cachedPosts_${orderBy}`;
 
-    if (
-      !forceRefresh &&
-      cachedData &&
-      cacheTime &&
-      Date.now() - parseInt(cacheTime) < CACHE_EXPIRATION
-    ) {
-      set({
-        posts: JSON.parse(cachedData),
-        loading: false,
-        lastRefreshTime: parseInt(cacheTime),
-      });
-      return;
+    // Try to get from IndexedDB first
+    if (!pageToken && !forceRefresh) {
+      const cachedData = await getPostsFromDB(cacheKey);
+      if (cachedData) {
+         // Check cache expiration time (if stored with data)
+        if (cachedData.timestamp && Date.now() - cachedData.timestamp < CACHE_EXPIRATION) {
+          set({
+            posts: cachedData.items || [],
+            loading: false,
+            lastRefreshTime: cachedData.timestamp,
+            nextPageToken: cachedData.nextPageToken || null, // Also load nextPageToken from cache
+          });
+          console.log('Loaded posts from IndexedDB cache', orderBy);
+          return;
+        } else {
+           // Cache expired, clear it
+          console.log('IndexedDB cache expired', orderBy);
+          await clearPostsFromDB(cacheKey);
+        }
+      }
     }
 
     try {
+      // Map orderBy UI value to Blogger API value
+      let apiOrderBy = orderBy;
+      if (orderBy === 'newest') apiOrderBy = 'published';
+      if (orderBy === 'updated') apiOrderBy = 'updated';
+
       const response = await axios.get(
-        `https://www.googleapis.com/blogger/v3/blogs/${blogConfig.blogId}/posts?key=${blogConfig.apiKey}&maxResults=200`
+        `https://www.googleapis.com/blogger/v3/blogs/${blogConfig.blogId}/posts`,
+        {
+          params: {
+            key: blogConfig.apiKey,
+            maxResults,
+            orderBy: apiOrderBy,
+            view,
+            pageToken
+          }
+        }
       );
+
+      const newPosts = response.data.items || [];
       const now = Date.now();
-      localStorage.setItem(CACHE_KEY, JSON.stringify(response.data.items || []));
-      localStorage.setItem(CACHE_TIME_KEY, now.toString());
-      set({
-        posts: response.data.items || [],
+      const newNextPageToken = response.data.nextPageToken || null;
+
+      // If it's the first page, save to IndexedDB
+      if (!pageToken) {
+        const dataToCache = { items: newPosts, timestamp: now, nextPageToken: newNextPageToken };
+        await savePostsToDB(cacheKey, dataToCache);
+        console.log('Saved posts to IndexedDB cache', orderBy);
+      }
+
+      set(state => ({
+        posts: pageToken ? [...state.posts, ...newPosts] : newPosts,
+        nextPageToken: newNextPageToken,
         loading: false,
         lastRefreshTime: now,
-      });
+      }));
     } catch (error) {
       set({ error: error.message, loading: false });
     }
   },
   refreshPosts: async () => {
-    const { lastRefreshTime } = get();
+    const { lastRefreshTime, selectedTag, orderBy } = get();
     const REFRESH_COOLDOWN = 30000; // 30 seconds
     const now = Date.now();
     const timeSinceLastRefresh = now - lastRefreshTime;
@@ -77,7 +110,11 @@ const useBlogStore = create((set, get) => ({
         toastStatus: 'warning',
       };
     }
-    await get().fetchPosts(true); // Call fetchPosts with forceRefresh = true
+    // Clear current cache in IndexedDB for the current orderBy before fetching
+    const cacheKey = `cachedPosts_${orderBy}`;
+    await clearPostsFromDB(cacheKey);
+    
+    await get().fetchPosts({ forceRefresh: true, orderBy, selectedTag }); // Call fetchPosts with forceRefresh = true
     return {
         shouldToast: true,
         toastMessage: 'Đã cập nhật dữ liệu mới nhất',

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Box, Text, Image, Skeleton, Badge, HStack, VStack, Progress } from '@chakra-ui/react';
-import { optimizeThumbnail, getThumbnailBySlug, extractImage } from '../../utils/blogUtils';
+import { optimizeThumbnail, getThumbnailBySlug, extractImage, getSlugFromUrl } from '../../utils/blogUtils';
 import { motion } from 'framer-motion';
 
 const MotionBox = motion(Box);
@@ -17,145 +17,159 @@ const HistoryCard = ({
   timestamp,
   timestampLabel,
   currentPage,
-  totalPages
+  totalPages,
+  isUpdated,
+  formatTime
 }) => {
   // Handle both post and item props
   const data = post || item;
   if (!data) return null;
 
-  const { title, content, labels = [], slug } = data;
+  const { title, content, labels = [], slug, url } = data;
   
   // Get cached posts from localStorage
   const cachedPosts = JSON.parse(localStorage.getItem('cachedPosts') || '[]');
 
   // Try different methods to get thumbnail
-  const thumbnailUrl = getThumbnailBySlug(cachedPosts, slug) || 
-                      (content && extractImage(content)) ||
-                      data.thumbnail; // Add direct thumbnail check
-  const optimizedThumbnail = optimizeThumbnail(thumbnailUrl, 600);
+  let thumbnailUrl = null;
+  
+  // 1. Try to get from cached posts by ID
+  if (data.id) {
+    const cachedPost = cachedPosts.find(cp => cp.id === data.id);
+    if (cachedPost?.thumbnail) {
+      thumbnailUrl = cachedPost.thumbnail;
+    }
+  }
+
+  // 2. Try to get from cached posts by slug
+  if (!thumbnailUrl && slug) {
+    const cachedPost = cachedPosts.find(cp => cp.slug === slug);
+    if (cachedPost?.thumbnail) {
+      thumbnailUrl = cachedPost.thumbnail;
+    }
+  }
+
+  // 3. Try to get from cached posts by URL
+  if (!thumbnailUrl && url) {
+    const urlSlug = getSlugFromUrl(url);
+    const cachedPost = cachedPosts.find(cp => cp.slug === urlSlug);
+    if (cachedPost?.thumbnail) {
+      thumbnailUrl = cachedPost.thumbnail;
+    }
+  }
+
+  // 4. Try to get from content
+  if (!thumbnailUrl && content) {
+    thumbnailUrl = extractImage(content);
+  }
+
+  // 5. Try to get from data directly
+  if (!thumbnailUrl && data.thumbnail) {
+    thumbnailUrl = data.thumbnail;
+  }
+
+  const optimizedThumbnail = thumbnailUrl ? optimizeThumbnail(thumbnailUrl, 600) : null;
 
   // Format bookmark page info
   const pageInfo = data.currentPage !== undefined && data.totalPages !== undefined
-    ? `Trang ${data.currentPage + 1}/${data.totalPages}`
+    ? `Tiến độ ${data.currentPage + 1}/${data.totalPages}`
     : null;
+
+  // Format timestamp
+  const displayTime = timestamp || (data.followAt || data.timestamp);
+  const timeLabel = timestampLabel || 'Theo dõi';
+
+  // Get the correct URL for the link
+  const getPostUrl = () => {
+    if (url) return url;
+    if (slug) return `/${slug}`;
+    if (data.id) {
+      const cachedPost = cachedPosts.find(cp => cp.id === data.id);
+      if (cachedPost?.url) return cachedPost.url;
+      if (cachedPost?.slug) return `/${cachedPost.slug}`;
+    }
+    return '/';
+  };
 
   return (
     <MotionBox
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3 }}
-      borderWidth="1px"
-      borderRadius="lg"
-      overflow="hidden"
-      bg={cardBg}
-      _hover={{ 
-        transform: 'translateY(-4px)',
-        boxShadow: 'lg',
-      }}
-      style={{
-        transition: 'all 0.3s ease'
-      }}
+      whileHover={{ y: -5 }}
+      transition={{ duration: 0.2 }}
     >
-      <Link to={`/${slug}${data.currentPage !== undefined ? `?p=${data.currentPage + 1}` : ''}`}>
-        <HStack spacing={4} p={4} align="start">
-          {/* Thumbnail */}
-          <Box 
-            flexShrink={0}
-            width="120px"
-            height="160px"
-            position="relative"
-            overflow="hidden"
-            borderRadius="md"
-            bg="gray.100"
-          >
+      <Link to={getPostUrl()}>
+        <Box
+          bg={cardBg}
+          p={4}
+          rounded="lg"
+          shadow="sm"
+          height="100%"
+          display="flex"
+          flexDirection="column"
+        >
+          {optimizedThumbnail ? (
             <Image
               src={optimizedThumbnail}
               alt={title}
-              width="100%"
-              height="100%"
+              borderRadius="md"
               objectFit="cover"
-              transition="transform 0.3s ease"
-              _groupHover={{ transform: 'scale(1.05)' }}
-              fallback={<Skeleton height="100%" width="100%" />}
+              width="100%"
+              height="200px"
+              fallback={<Skeleton height="200px" />}
             />
-            {/* Labels */}
-            {labels.length > 0 && (
-              <Badge
-                position="absolute"
-                top={2}
-                left={2}
-                colorScheme="pink"
-                variant="solid"
-                fontSize="xs"
-                textTransform="uppercase"
-                px={2}
-                py={1}
-                borderRadius="full"
-                opacity={0.9}
-              >
-                {labels[0]}
-              </Badge>
-            )}
-          </Box>
+          ) : (
+            <Skeleton height="200px" />
+          )}
 
-          {/* Content */}
-          <VStack 
-            flex={1} 
-            spacing={2} 
-            align="start"
-          >
+          <VStack align="stretch" mt={4} spacing={2} flex={1}>
             <Text
-              fontSize="md"
+              fontSize="lg"
               fontWeight="semibold"
               color={textColor}
               noOfLines={2}
+              lineHeight="1.4"
             >
-              {title}
+              {title || 'Không có tiêu đề'}
             </Text>
 
-            {/* Time Info */}
-            {timestamp && timestampLabel && (
-              <Text fontSize="sm" color={mutedTextColor}>
-                {timestampLabel}: {new Date(timestamp).toLocaleString('vi-VN')}
-              </Text>
+            {labels && labels.length > 0 && (
+              <HStack spacing={2} wrap="wrap">
+                {labels.map((label, index) => (
+                  <Badge key={index} colorScheme="blue" variant="subtle">
+                    {label}
+                  </Badge>
+                ))}
+              </HStack>
             )}
 
-            {/* Reading Progress */}
             {pageInfo && (
-              <Box width="100%">
+              <Box>
                 <Text fontSize="sm" color={mutedTextColor} mb={1}>
                   {pageInfo}
                 </Text>
-                <Progress 
-                  value={(data.currentPage + 1) / data.totalPages * 100} 
-                  size="sm" 
-                  colorScheme="pink" 
+                <Progress
+                  value={(data.currentPage / data.totalPages) * 100}
+                  size="sm"
+                  colorScheme="blue"
                   borderRadius="full"
                 />
               </Box>
             )}
 
-            {/* Legacy Time Info */}
-            {data.readAt && !timestamp && (
+            {displayTime && (
               <Text fontSize="sm" color={mutedTextColor}>
-                Đọc lúc: {new Date(data.readAt).toLocaleString('vi-VN')}
-              </Text>
-            )}
-            {data.followAt && !timestamp && (
-              <Text fontSize="sm" color={mutedTextColor}>
-                Follow lúc: {new Date(data.followAt).toLocaleString('vi-VN')}
+                {timeLabel}: {formatTime ? formatTime(displayTime) : new Date(displayTime).toLocaleDateString()}
               </Text>
             )}
 
-            {/* Action Button */}
-            {actionButton && (
-              <Box mt={2} width="100%">
-                {actionButton}
-              </Box>
+            {isUpdated && (
+              <Badge colorScheme="green" alignSelf="flex-start">
+                Có cập nhật mới
+              </Badge>
             )}
+
+            {actionButton}
           </VStack>
-        </HStack>
+        </Box>
       </Link>
     </MotionBox>
   );

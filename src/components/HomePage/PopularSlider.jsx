@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Glide from '@glidejs/glide';
 import { blogConfig } from '../../config';
+import { fetchPosts } from '../../api';
 import './PopularSlider.css';
 
 function getThumbnail(post) {
@@ -19,14 +20,18 @@ function PopularSlider() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const url = `https://www.googleapis.com/blogger/v3/blogs/${blogConfig.blogId}/posts?key=${blogConfig.apiKey}&maxResults=10`;
-
-    fetch(url)
-      .then(res => res.json())
-      .then(data => {
+    const loadPosts = async () => {
+      try {
+        const data = await fetchPosts(10);
         if (data.items) setPosts(data.items);
-      })
-      .finally(() => setLoading(false));
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPosts();
   }, []);
 
   useEffect(() => {

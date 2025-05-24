@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { blogConfig } from '../config';
+import { fetchPages } from '../api';
 
 function extractImage(content) {
   const div = document.createElement('div');
@@ -14,19 +15,20 @@ function PagesList() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const url = `https://www.googleapis.com/blogger/v3/blogs/${blogConfig.blogId}/pages?key=${blogConfig.apiKey}&maxResults=50`;
-
-    fetch(url)
-      .then(res => res.json())
-      .then(data => {
+    const loadPages = async () => {
+      try {
+        const data = await fetchPages();
         setPages(data.items || []);
-        setLoading(false);
-      })
-      .catch(err => {
+      } catch (err) {
         console.error(err);
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    loadPages();
   }, []);
+
   document.title = "Danh sách Trang";
   if (loading) return <div className="text-center my-4">Đang tải trang...</div>;
   if (pages.length === 0) return <div className="text-center my-4">Không có trang nào.</div>;

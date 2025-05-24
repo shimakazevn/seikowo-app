@@ -248,7 +248,8 @@ const useSearchHistory = () => {
       toast({
         title: 'Search history cleared',
         status: 'success',
-        duration: 2000,
+        duration: 3000,
+        isClosable: true,
       });
     } catch (error) {
       console.error('Error clearing search history:', error);
@@ -262,244 +263,132 @@ const useSearchHistory = () => {
   };
 
   return {
+    saveSearchKeyword,
+    getSearchKeywords,
     saveSearchResult,
     getSearchHistory,
     getPreviousResults,
-    getSearchKeywords,
-    saveSearchKeyword,
     clearSearchHistory,
   };
 };
 
-// Update useSearchEffects to include caching
+// Custom hook for search effects
 const useSearchEffects = ({ isOpen, searchQuery, isLoading, performSearch, inputRef, filters }) => {
   const searchTimeoutRef = useRef(null);
-  const prevFiltersRef = useRef(filters);
-  const prevQueryRef = useRef(searchQuery);
-  const { saveSearchResult } = useSearchHistory();
 
-  // Effect for search query changes
-  useEffect(() => {
-    if (!isOpen) return;
-    
-    if (prevQueryRef.current === searchQuery) return;
-    prevQueryRef.current = searchQuery;
-
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    if (!searchQuery.trim()) {
-      useSearchStore.setState({ 
-        isLoading: false,
-        searchResults: [],
-        error: null
-      });
-      return;
-    }
-
-    searchTimeoutRef.current = setTimeout(async () => {
-      try {
-        const results = await performSearch(searchQuery);
-        if (results && Array.isArray(results)) {
-          saveSearchResult(searchQuery, results);
-        }
-      } catch (error) {
-        console.error('Search error:', error);
-      }
-    }, 400);
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [searchQuery, isOpen, performSearch, saveSearchResult]);
-
-  // Effect for filter changes
-  useEffect(() => {
-    if (!isOpen || !searchQuery.trim()) return;
-    
-    if (JSON.stringify(prevFiltersRef.current) === JSON.stringify(filters)) return;
-    prevFiltersRef.current = filters;
-
-    performSearch(searchQuery).catch(error => {
-      console.error('Filter search error:', error);
-    });
-  }, [filters, isOpen, performSearch, searchQuery]);
-
-  // Effect for input focus
   useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (searchQuery.trim()) {
+      searchTimeoutRef.current = setTimeout(() => {
+        performSearch(searchQuery);
+      }, 300);
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery, performSearch]);
+
   return searchTimeoutRef;
 };
 
-const ResultItem = React.memo(({ result, onClose, handleTagClick, hoverBg, imageBg }) => {
-  const thumbnail = extractThumbnail(result);
-  const maxLabels = useBreakpointValue({ base: 2, sm: 3, md: 4, lg: 5 });
-  
-  return (
-    <Box
-      p={3}
-      borderRadius="md"
-      _hover={{ 
-        bg: hoverBg,
-        transform: 'translateY(-2px)',
-        boxShadow: 'md'
-      }}
-      transition="all 0.2s ease-in-out"
-      as={Link}
-      to={`/${getSlugFromUrl(result.url)}`}
-      onClick={onClose}
-      position="relative"
-      display="block"
-      width="100%"
-      pointerEvents="auto"
-      style={{ touchAction: 'pan-y pinch-zoom' }}
-    >
-      <Box
-        display="flex"
-        alignItems="flex-start"
-        gap={4}
-        width="100%"
-      >
-        <Box
-          flexShrink={0}
-          width="80px"
-          height="120px"
-          position="relative"
-          borderRadius="md"
-          overflow="hidden"
-        >
-          <LazyLoadImage
-            src={thumbnail || './images/no-image.png'}
-            alt={result.title}
-            width="100%"
-            height="100%"
-            effect="blur"
-            style={{ objectFit: 'cover', width: '100%', height: '100%' }}
-          />
-        </Box>
-        <Box flex="1" minWidth="0">
-          <Text 
-            fontWeight="semibold"
-            mb={2}
-            display="block"
-            noOfLines={1}
-            fontSize="md"
-          >
-            {result.title}
-          </Text>
-          <Box
-            position="relative"
-            maxHeight="3.6em"
-            overflow="hidden"
-            mb={3}
-          >
-            <Text 
-              fontSize="sm" 
-              color="gray.500"
-              noOfLines={2}
-              sx={{
-                lineHeight: '1.4em',
-                wordBreak: 'break-word',
-                display: '-webkit-box',
-                WebkitBoxOrient: 'vertical',
-                WebkitLineClamp: '2',
-                overflow: 'hidden'
-              }}
-            >
-              {result.content.replace(/<[^>]*>/g, '')}
-            </Text>
-          </Box>
-          {result.labels && result.labels.length > 0 && (
-            <HStack spacing={2} display="flex" flexWrap="wrap" gap={2}>
-              {result.labels.slice(0, maxLabels).map((label) => (
-                <Tag
-                  key={label}
-                  size="sm"
-                  variant="subtle"
-                  colorScheme="blue"
-                  cursor="pointer"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleTagClick(label);
-                  }}
-                  _hover={{
-                    bg: 'blue.100'
-                  }}
-                  transition="background 0.2s ease"
-                >
-                  {label}
-                </Tag>
-              ))}
-              {result.labels.length > maxLabels && (
-                <Tag size="sm" variant="subtle">
-                  +{result.labels.length - maxLabels}
-                </Tag>
-              )}
-            </HStack>
-          )}
-        </Box>
-      </Box>
-    </Box>
-  );
-});
+// Search Results List Component
+const SearchResultsList = React.memo(({ searchResults, isLoading }) => {
+  const textColor = useColorModeValue('gray.600', 'gray.400');
+  const hoverBg = useColorModeValue('gray.50', 'gray.700');
+  const imageBg = useColorModeValue('gray.100', 'gray.700');
 
-const SearchResults = React.memo(({ searchResults, closeSearch, handleTagClick, hoverBg, imageBg }) => {
-  const resultsContainerRef = useRef(null);
-  const scrollColor = useColorModeValue('gray.300', 'gray.600');
-  const scrollTrackColor = useColorModeValue('gray.100', 'gray.700');
-  const scrollHoverColor = useColorModeValue('gray.400', 'gray.500');
+  const rowRenderer = ({ index, key, style }) => {
+    const post = searchResults[index];
+    const thumbnail = extractThumbnail(post);
+    const slug = getSlugFromUrl(post.link);
 
-  const rowRenderer = useMemo(() => ({ index, key, style }) => {
-    const result = searchResults[index];
     return (
-      <div key={key} style={style}>
-        <ResultItem
-          result={result}
-          onClose={closeSearch}
-          handleTagClick={handleTagClick}
-          hoverBg={hoverBg}
-          imageBg={imageBg}
-        />
-      </div>
+      <Box key={key} style={style}>
+        <Link to={`/post/${slug}`}>
+          <HStack
+            spacing={4}
+            p={2}
+            borderRadius="lg"
+            _hover={{ bg: hoverBg }}
+            transition="all 0.2s"
+          >
+            <Box
+              w="100px"
+              h="100px"
+              borderRadius="md"
+              overflow="hidden"
+              bg={imageBg}
+              flexShrink={0}
+            >
+              {thumbnail ? (
+                <LazyLoadImage
+                  src={thumbnail}
+                  alt={post.title}
+                  effect="blur"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                  }}
+                />
+              ) : (
+                <Box w="100%" h="100%" bg={imageBg} />
+              )}
+            </Box>
+            <VStack align="start" spacing={1} flex={1}>
+              <Text
+                fontWeight="medium"
+                noOfLines={2}
+                color={textColor}
+              >
+                {post.title}
+              </Text>
+              <Text fontSize="sm" color={textColor} noOfLines={2}>
+                {post.excerpt}
+              </Text>
+            </VStack>
+          </HStack>
+        </Link>
+      </Box>
     );
-  }, [searchResults, closeSearch, handleTagClick, hoverBg, imageBg]);
+  };
+
+  if (isLoading) {
+    return (
+      <Box py={6} textAlign="center">
+        <Spinner size="lg" thickness="4px" color="blue.400" speed="0.65s" />
+        <Text mt={2} color="gray.500">Đang tìm kiếm...</Text>
+        <SkeletonText mt={4} noOfLines={3} spacing={3} skeletonHeight="4" />
+      </Box>
+    );
+  }
+
+  if (searchResults.length === 0) {
+    return (
+      <Box py={6} textAlign="center">
+        <Text color="gray.500">Không tìm thấy kết quả</Text>
+      </Box>
+    );
+  }
 
   return (
     <Box
-      ref={resultsContainerRef}
-      height="400px"
-      overflowY="auto"
-      position="relative"
-      onClick={(e) => e.stopPropagation()}
-      css={{
-        '&::-webkit-scrollbar': {
-          width: '4px',
-        },
-        '&::-webkit-scrollbar-track': {
-          width: '6px',
-          background: scrollTrackColor,
-        },
-        '&::-webkit-scrollbar-thumb': {
-          background: scrollColor,
-          borderRadius: '24px',
-        },
-        '&::-webkit-scrollbar-thumb:hover': {
-          background: scrollHoverColor,
-        },
-        '.ReactVirtualized__Grid': {
-          '&:focus': {
-            outline: 'none',
-          },
-          WebkitOverflowScrolling: 'touch',
-        },
+      style={{
+        height: 'calc(80vh - 200px)',
+        overflow: 'auto',
+        WebkitOverflowScrolling: 'touch',
       }}
     >
       <AutoSizer>
@@ -671,7 +560,7 @@ const SearchModal = () => {
             bg={useColorModeValue("rgba(255, 255, 255, 0.48)", "rgba(26, 32, 44, 0.48)")}
             _hover={{ bg: useColorModeValue("rgba(255,255,255,0.68)", "rgba(26,32,44,0.68)") }}
             _focus={{ bg: useColorModeValue('white', 'gray.600') }}
-            _placeholder={{ color: useColorModeValue("rgba(255,255,255,0.68)", "rgba(26,32,44,0.68)") }}
+            _placeholder={{ color: useColorModeValue("rgba(0, 0, 0, 0.68)", "rgba(255, 255, 255, 0.68)") }}
             borderRadius="lg"
           />
           <Text fontSize="xs" color={textColor} mt={2}>
@@ -740,29 +629,10 @@ const SearchModal = () => {
           )}
 
           {searchQuery.length > 0 && (
-            isLoading ? (
-              <Box py={6} textAlign="center">
-                <Spinner size="lg" thickness="4px" color="blue.400" speed="0.65s" />
-                <Text mt={2} color="gray.500">Đang tìm kiếm...</Text>
-                <SkeletonText mt={4} noOfLines={3} spacing={3} skeletonHeight="4" />
-              </Box>
-            ) : error ? (
-              <Box py={6} textAlign="center">
-                <Text color="red.500">{error}</Text>
-              </Box>
-            ) : searchResults.length === 0 ? (
-              <Box py={6} textAlign="center">
-                <Text color={textColor}>Không tìm thấy kết quả</Text>
-              </Box>
-            ) : (
-                <SearchResults
-                  searchResults={searchResults}
-                  closeSearch={closeSearch}
-                  handleTagClick={handlers.handleTagClick}
-                  hoverBg={hoverBg}
-                  imageBg={imageBg}
-                />
-            )
+            <SearchResultsList
+              searchResults={searchResults}
+              isLoading={isLoading}
+            />
           )}
         </Box>
       </ModalContent>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { blogConfig } from '../config';
+import { fetchPostsByTag } from '../api';
 
 function PostsByTag() {
   const { label } = useParams();
@@ -22,16 +23,18 @@ function PostsByTag() {
   };
 
   useEffect(() => {
-    const encodedLabel = encodeURIComponent(label);
-    const url = `https://www.googleapis.com/blogger/v3/blogs/${blogConfig.blogId}/posts?key=${blogConfig.apiKey}&labels=${encodedLabel}&maxResults=12`;
-
-    fetch(url)
-      .then(res => res.json())
-      .then(data => {
+    const loadPosts = async () => {
+      try {
+        const data = await fetchPostsByTag(label);
         setPosts(data.items || []);
+      } catch (error) {
+        console.error(error);
+      } finally {
         setLoading(false);
-      })
-      .catch(() => setLoading(false));
+      }
+    };
+
+    loadPosts();
   }, [label]);
 
   if (loading) return <div className="text-center">Đang tải bài viết...</div>;

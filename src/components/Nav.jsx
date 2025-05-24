@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useState } from 'react';
+import React, { memo, useCallback, useEffect, useState, useMemo } from 'react';
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -31,6 +31,21 @@ import {
   PopoverContent,
   useBreakpointValue,
   useToast,
+  Badge,
+  Avatar,
+  Divider,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalCloseButton,
+  ModalBody,
+  ModalFooter,
+  Alert,
+  AlertIcon,
+  AlertTitle,
+  AlertDescription,
+  Heading,
 } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -42,22 +57,47 @@ import {
   CloseIcon,
   ChevronRightIcon,
   TimeIcon,
+  StarIcon,
+  DownloadIcon,
+  DeleteIcon,
 } from '@chakra-ui/icons';
+import { 
+  FaHeart, 
+  FaUser, 
+  FaSignInAlt, 
+  FaSignOutAlt, 
+  FaUserCircle, 
+  FaHistory, 
+  FaBookmark,
+  FaEnvelope,
+  FaInfoCircle,
+  FaCog
+} from 'react-icons/fa';
 import SearchModal from './Search/SearchModal';
 import useSearchStore from '../store/useSearchStore';
 import NavLogo from './Nav/NavLogo';
 import NavActions from './Nav/NavActions';
 import NavMenuDesktop from './Nav/NavMenuDesktop';
 import NavMenuMobile from './Nav/NavMenuMobile';
-import { backupUserData } from './GoogleDriveLogin';
+import { backupUserData } from '../api/auth';
+import { deleteUserData } from '../api/auth';
 import { 
-  syncGuestData, 
-  getHistoryData,
-  READ_KEY,
   FOLLOW_KEY,
-  MANGA_KEY
-} from '../utils/historyUtils';
+  MANGA_KEY,
+  getUserInfo,
+  setUserInfo,
+  removeUserInfo,
+  setStoredTokens,
+  removeStoredTokens
+} from '../utils/userUtils';
 import NavLink from './Nav/NavLink';
+import useUserStore from '../store/useUserStore';
+import { useGoogleLogin } from '@react-oauth/google';
+import { useAuth } from '../hooks/useAuth';
+import { LoginButton, GoogleAuthEvents } from './GoogleDriveLogin';
+import { handleError } from '../api';
+import SettingsModal from './Modals/SettingsModal';
+import { getHistoryData, saveHistoryData } from '../utils/indexedDBUtils';
 
 const DesktopSubNav = memo(({ name, path }) => {
   return (
@@ -247,30 +287,33 @@ const MobileNav = memo(({ menuItems, isOpen, isActive, activeColor, textColor, h
 MobileNav.displayName = 'MobileNav';
 
 const Nav = () => {
+  // All hooks at the top
   const { isOpen, onToggle, onClose } = useDisclosure();
   const { colorMode, toggleColorMode } = useColorMode();
   const { openSearch } = useSearchStore();
   const location = useLocation();
   const navigate = useNavigate();
-  const [userId, setUserId] = useState('guest');
-  const [accessToken, setAccessToken] = useState(null);
+  const { userId, accessToken, isGuest, setUser, setGuest } = useUserStore();
   const [atTop, setAtTop] = useState(true);
+  const [updatedFollowCount, setUpdatedFollowCount] = useState(0);
   const toast = useToast();
+  const { isOpen: isSettingsOpen, onOpen: onSettingsOpen, onClose: onSettingsClose } = useDisclosure();
+  const [restoring, setRestoring] = useState(false);
+  const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onClose: onConfirmClose } = useDisclosure();
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setAtTop(window.scrollY === 0);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
+  // Color mode values (moved all useColorModeValue here)
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const activeColor = useColorModeValue('blue.600', 'blue.300');
   const textColor = useColorModeValue('gray.700', 'gray.200');
   const hoverColor = useColorModeValue('blue.800', 'blue.200');
+  const transparentBg = useColorModeValue('rgba(255, 255, 255, 0.8)', 'rgba(26, 32, 44, 0.8)');
+  const gray600 = useColorModeValue('gray.600', 'gray.200');
+  const blue600 = useColorModeValue('blue.600', 'blue.200');
+  const gray200 = useColorModeValue('gray.200', 'gray.700');
+  const mutedTextColor = useColorModeValue('gray.500', 'gray.500');
 
+  // Callbacks
   const handleToggleColorMode = useCallback(() => {
     toggleColorMode();
   }, [toggleColorMode]);
@@ -279,188 +322,81 @@ const Nav = () => {
     openSearch();
   }, [openSearch]);
 
-  // Load user data on mount and token change
-  useEffect(() => {
-    const loadUserData = () => {
-      const token = localStorage.getItem('furina_water');
-      const id = localStorage.getItem('google_user_id') || 'guest';
-      
-      if (token) {
-        setAccessToken(token);
-        setUserId(id);
-        
-        // If we're on a user's history page but not logged in as that user,
-        // redirect to the current user's history page
-        const urlUserId = location.pathname.match(/^\/u\/([^/]+)/)?.[1];
-        if (urlUserId && urlUserId !== id && urlUserId !== 'guest') {
-          navigate(`/u/${id}`);
-        }
-      } else {
-        // If no token, ensure we're in guest mode
-        setAccessToken(null);
-        setUserId('guest');
-        localStorage.removeItem('google_user_id');
-        
-        // If we're on a user's history page but not in guest mode,
-        // redirect to guest history
-        const urlUserId = location.pathname.match(/^\/u\/([^/]+)/)?.[1];
-        if (urlUserId && urlUserId !== 'guest') {
-          navigate('/u/guest');
-        }
-      }
-    };
-
-    loadUserData();
-    
-    // Add storage event listener to sync across tabs
-    const handleStorageChange = (e) => {
-      if (e.key === 'furina_water' || e.key === 'google_user_id') {
-        loadUserData();
-      }
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [location.pathname, navigate]);
-
   const handleLogin = useCallback(async (token) => {
     try {
-      const id = localStorage.getItem('google_user_id');
-      
-      if (!id) {
-        throw new Error('Không thể lấy ID người dùng');
+      // Lưu token ngay lập tức
+      setStoredTokens(token);
+
+      // Lấy thông tin user từ token
+      const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get user info');
       }
 
-      // Sync guest data when logging in
-      const syncResult = await syncGuestData(id);
+      const userInfo = await response.json();
       
-      // Only proceed with login if sync was successful
-      if (syncResult.synced) {
-        // Show success toast with sync results
-        if (syncResult.changes.reads > 0 || syncResult.changes.follows > 0 || syncResult.changes.bookmarks > 0) {
-          const details = [];
-          
-          if (syncResult.changes.reads > 0) {
-            details.push(`${syncResult.changes.reads} bài đã đọc`);
-          }
-          
-          if (syncResult.changes.follows > 0) {
-            details.push(`${syncResult.changes.follows} bài theo dõi`);
-          }
-          
-          if (syncResult.changes.bookmarks > 0) {
-            details.push(`${syncResult.changes.bookmarks} bookmark`);
-          }
+      // Lưu user info
+      setUserInfo({
+        sub: userInfo.sub,
+        name: userInfo.name,
+        given_name: userInfo.given_name,
+        family_name: userInfo.family_name,
+        picture: userInfo.picture,
+        email: userInfo.email,
+        email_verified: userInfo.email_verified
+      });
 
-          toast({
-            title: 'Đã đồng bộ dữ liệu từ chế độ khách',
-            description: details.join('\n'),
-            status: 'success',
-            duration: 5000,
-            isClosable: true,
-          });
-        }
-        
-        // Backup synced data to Drive
-        try {
-          const currentData = {
-            readPosts: getHistoryData(READ_KEY, id),
-            followPosts: getHistoryData(FOLLOW_KEY, id),
-            mangaBookmarks: getHistoryData(MANGA_KEY, id),
-            timestamp: Date.now()
-          };
-          
-          await backupUserData(token, id, currentData);
-          
-          // Only update state and localStorage after successful backup
-          setAccessToken(token);
-          setUserId(id);
-          localStorage.setItem('furina_water', token);
-          
-          // Navigate to user's history page
-          navigate(`/u/${id}`);
-          
-          toast({
-            title: 'Đã sao lưu dữ liệu lên Drive',
-            status: 'success',
-            duration: 3000,
-            isClosable: true,
-          });
-        } catch (err) {
-          console.error('Error backing up after guest sync:', err);
-          toast({
-            title: 'Lỗi sao lưu',
-            description: 'Không thể sao lưu dữ liệu lên Drive. Vui lòng thử lại sau.',
-            status: 'warning',
-            duration: 5000,
-            isClosable: true,
-          });
-        }
-      }
-    } catch (err) {
-      console.error('Error during login process:', err);
+      // Cập nhật state
+      setUser(userInfo.sub, token);
+
       toast({
-        title: 'Lỗi đăng nhập',
-        description: err.message || 'Có lỗi xảy ra trong quá trình đăng nhập',
-        status: 'error',
-        duration: 5000,
+        title: "Đăng nhập thành công",
+        description: `Chào mừng ${userInfo.name}!`,
+        status: "success",
+        duration: 3000,
         isClosable: true,
       });
-      
-      // Reset state on error
-      setAccessToken(null);
-      setUserId('guest');
-      localStorage.removeItem('furina_water');
-      localStorage.removeItem('google_user_id');
+
+    } catch (error) {
+      console.error('Login error:', error);
+      toast({
+        title: "Lỗi đăng nhập",
+        description: "Không thể lấy thông tin người dùng",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+      // Clean up on error
+      removeStoredTokens();
+      removeUserInfo();
+      setGuest();
     }
-  }, [toast, navigate]);
+  }, [setUser, setGuest, toast]);
 
-  const handleLogout = useCallback(async () => {
-    // Backup data before logout if user is logged in
-    if (accessToken && userId !== 'guest') {
-      try {
-        const currentData = {
-          readPosts: getHistoryData(READ_KEY, userId),
-          followPosts: getHistoryData(FOLLOW_KEY, userId),
-          mangaBookmarks: getHistoryData(MANGA_KEY, userId),
-          timestamp: Date.now()
-        };
-        await backupUserData(accessToken, userId, currentData);
-      } catch (err) {
-        console.error('Auto backup on logout failed:', err);
-      }
-    }
-    
-    // Clear state
-    setAccessToken(null);
-    setUserId('guest');
-
-    // Clear all user data from localStorage
-    const keysToRemove = [
-      'furina_water',
-      'google_user_id',
-      `history_read_posts_${userId}`,
-      `history_follow_posts_${userId}`,
-      `history_manga_bookmarks_${userId}`,
-      `last_sync_time`
-    ];
-
-    keysToRemove.forEach(key => localStorage.removeItem(key));
-
-    // Navigate to home page
-    navigate('/');
-  }, [accessToken, userId, navigate]);
+  const handleLogout = useCallback(() => {
+    removeStoredTokens();
+    removeUserInfo();
+    setGuest();
+  }, [setGuest]);
 
   const handleHistory = useCallback(() => {
-    navigate(`/u/${userId}`);
-  }, [navigate, userId]);
+    navigate('/bookmarks');
+  }, [navigate]);
 
-  const menuItems = React.useMemo(() => [
-    { name: 'Trang chủ', path: '/' },
-    { name: 'Categories', path: '/categories' },
-    { name: 'About', path: '/about' },
-    { name: 'Contact', path: '/contact' },
-  ], [userId]);
+  const handleProfile = useCallback(() => {
+    navigate('/profile');
+  }, [navigate]);
+
+  const handleViewMore = useCallback(() => {
+    navigate('/favorite');
+  }, [navigate]);
+
+  const handleSettings = useCallback(() => {
+    navigate('/settings');
+  }, [navigate]);
 
   const isActive = useCallback((path) => {
     if (path === '/') {
@@ -469,104 +405,313 @@ const Nav = () => {
     return location.pathname.startsWith(path);
   }, [location.pathname]);
 
+  // Memoized values
+  const menuItems = useMemo(() => [
+  ], []);
+
+  // Google login hook
+  const login = useGoogleLogin({
+    onSuccess: (response) => {
+      if (response.access_token) {
+        handleLogin(response.access_token);
+      }
+    },
+    flow: 'implicit',
+    scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+    access_type: 'offline',
+    prompt: 'consent',
+    redirect_uri: window.location.origin,
+    popup: true,
+    popup_width: 500,
+    popup_height: 600,
+    popup_position: 'center',
+    popup_type: 'window',
+    popup_features: 'width=500,height=600,left=0,top=0,resizable=yes,scrollbars=yes,status=yes'
+  });
+
+  // Effects
+  useEffect(() => {
+    const handleScroll = () => {
+      setAtTop(window.scrollY === 0);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const cleanup = useUserStore.getState().initialize();
+    return cleanup;
+  }, []);
+
+  useEffect(() => {
+    const urlUserId = location.pathname.match(/^\/u\/([^/]+)/)?.[1];
+    
+    if (urlUserId) {
+      if (isGuest && urlUserId !== 'guest') {
+        navigate('/u/guest');
+      } else if (!isGuest && urlUserId !== userId) {
+        navigate(`/u/${userId}`);
+      }
+    }
+  }, [location.pathname, navigate, userId, isGuest]);
+
+  useEffect(() => {
+    if (!isGuest && accessToken) {
+      const checkUpdatedFollows = () => {
+        const userInfo = getUserInfo();
+        const userId = userInfo?.sub || 'guest';
+        const followedData = getHistoryData(FOLLOW_KEY, userId);
+        if (followedData && Array.isArray(followedData)) {
+          const updatedCount = followedData.filter(post => {
+            if (!post.updated || !post.published) return false;
+            const updated = new Date(post.updated);
+            const published = new Date(post.published);
+            return updated > published;
+          }).length;
+          setUpdatedFollowCount(updatedCount);
+        }
+      };
+
+      checkUpdatedFollows();
+      const interval = setInterval(checkUpdatedFollows, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [isGuest, accessToken]);
+
+  const syncWithDrive = useCallback(async () => {
+    if (!accessToken || !userId) {
+      toast({
+        title: "Lỗi",
+        description: "Vui lòng đăng nhập để sử dụng tính năng này",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    try {
+      setRestoring(true);
+      await backupUserData(accessToken);
+      toast({
+        title: "Thành công",
+        description: "Đã sao lưu dữ liệu lên Google Drive",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      handleError(error, toast);
+    } finally {
+      setRestoring(false);
+    }
+  }, [accessToken, userId, toast]);
+
+  const handleClearAllData = useCallback(async () => {
+    if (!accessToken || !userId) {
+      toast({
+        title: "Lỗi",
+        description: "Vui lòng đăng nhập để sử dụng tính năng này",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    try {
+      setRestoring(true);
+      await deleteUserData(accessToken);
+      const userInfo = getUserInfo();
+      const currentUserId = userInfo?.sub || 'guest';
+      await saveHistoryData(FOLLOW_KEY, currentUserId, []);
+      await saveHistoryData(MANGA_KEY, currentUserId, []);
+      toast({
+        title: "Thành công",
+        description: "Đã xóa toàn bộ dữ liệu",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+      onConfirmClose();
+    } catch (error) {
+      handleError(error, toast);
+    } finally {
+      setRestoring(false);
+    }
+  }, [accessToken, userId, toast, onConfirmClose]);
+
   return (
-    <Box
-      position="sticky"
-      top={0}
-      zIndex={1000}
-      bg={atTop ? 'transparent' : useColorModeValue('rgba(255, 255, 255, 0.8)', 'rgba(26, 32, 44, 0.8)')}
-      borderBottom={atTop ? 'none' : 1}
-      borderStyle={atTop ? 'none' : 'solid'}
-      borderColor={atTop ? 'transparent' : borderColor}
-      backdropFilter={atTop ? 'none' : 'blur(12px)'}
-      webkitbackdropfilter={atTop ? 'none' : 'blur(12px)'}
-      transition="all 0.3s ease"
-    >
-      <Flex
-        bg="transparent"
-        color={useColorModeValue('gray.600', 'white')}
-        minH={'60px'}
-        py={{ base: 2 }}
-        px={{ base: 2, md: 4 }}
-        align={'center'}
-        maxW="100%"
-        position="relative"
+    <>
+      <Box
+        position="sticky"
+        top={0}
+        zIndex={1000}
+        bg={atTop ? 'transparent' : transparentBg}
+        borderBottom={atTop ? 'none' : 1}
+        borderStyle={atTop ? 'none' : 'solid'}
+        borderColor={atTop ? 'transparent' : borderColor}
+        backdropFilter={atTop ? 'none' : 'blur(12px)'}
+        webkitbackdropfilter={atTop ? 'none' : 'blur(12px)'}
+        transition="all 0.3s ease"
       >
         <Flex
-          flex={{ base: 'initial', md: 'auto' }}
-          ml={{ base: -2 }}
-          display={{ base: 'flex', md: 'none' }}
-          align="center"
-          zIndex={1001}
-        >
-          <IconButton
-            onClick={onToggle}
-            icon={
-              isOpen ? <CloseIcon w={3} h={3} /> : <HamburgerIcon w={5} h={5} />
-            }
-            variant={'ghost'}
-            aria-label={'Toggle Navigation'}
-            size="sm"
-            ml={2}
-            mr={1}
-          />
-        </Flex>
-
-        <Box flex="0 0 auto" minW="120px">
-          <NavLogo />
-        </Box>
-
-        <Flex
-          flex={1}
-          align="center"
-          minW={0}
+          bg="transparent"
+          color={gray600}
+          minH={'60px'}
+          py={{ base: 2 }}
+          px={{ base: 2, md: 4 }}
+          align={'center'}
+          maxW="100%"
           position="relative"
         >
-          <Box
-            display={{ base: 'none', md: 'block' }}
-            position="absolute"
-            left={0}
-            right={0}
-            mx="auto"
-            width="fit-content"
-          >
-            <DesktopNav
-              menuItems={menuItems}
-              isActive={isActive}
-              activeColor={activeColor}
-              textColor={textColor}
-              hoverColor={hoverColor}
-            />
+          <Box flex="0 0 auto" minW="120px">
+            <NavLogo />
           </Box>
+
+          <Flex
+            flex={1}
+            align="center"
+            minW={0}
+            position="relative"
+          >
+            <Box
+              display={{ base: 'none', md: 'block' }}
+              position="absolute"
+              left={0}
+              right={0}
+              mx="auto"
+              width="fit-content"
+            >
+              <DesktopNav
+                menuItems={menuItems}
+                isActive={isActive}
+                activeColor={activeColor}
+                textColor={textColor}
+                hoverColor={hoverColor}
+              />
+            </Box>
+          </Flex>
+
+          <HStack spacing={2} ml="auto">
+            <IconButton
+              icon={colorMode === 'light' ? <MoonIcon /> : <SunIcon />}
+              onClick={handleToggleColorMode}
+              variant="ghost"
+              size="sm"
+              aria-label="Toggle color mode"
+            />
+            <IconButton
+              icon={<SearchIcon />}
+              onClick={handleOpenSearch}
+              variant="ghost"
+              size="sm"
+              aria-label="Search"
+            />
+            <Menu>
+              <MenuButton
+                as={IconButton}
+                icon={<FaUser />}
+                variant="ghost"
+                size="sm"
+                aria-label="User menu"
+              />
+              <MenuList>
+                {isGuest ? (
+                  <MenuItem icon={<FaSignInAlt />} onClick={() => login()}>
+                    Đăng nhập
+                  </MenuItem>
+                ) : (
+                  <>
+                    <MenuItem icon={<FaUserCircle />} onClick={handleProfile}>
+                      Hồ sơ
+                    </MenuItem>
+                    <MenuItem icon={<FaHistory />} onClick={handleHistory}>
+                      Bookmark
+                    </MenuItem>
+                    <MenuItem icon={<FaBookmark />} onClick={handleViewMore}>
+                      <HStack spacing={2}>
+                        <span>Yêu thích</span>
+                        {updatedFollowCount > 0 && (
+                          <Badge
+                            colorScheme="red"
+                            borderRadius="full"
+                            px={2}
+                            py={0.5}
+                            fontSize="0.75em"
+                            fontWeight="bold"
+                            lineHeight={1}
+                          >
+                            {updatedFollowCount}
+                          </Badge>
+                        )}
+                      </HStack>
+                    </MenuItem>
+                    <MenuItem icon={<FaCog />} onClick={onSettingsOpen}>
+                      Cài đặt
+                    </MenuItem>
+                  </>
+                )}
+                <Divider />
+                <MenuItem as={RouterLink} to="/about" icon={<FaInfoCircle />}>
+                  About
+                </MenuItem>
+                <MenuItem as={RouterLink} to="/contact" icon={<FaEnvelope />}>
+                  Contact
+                </MenuItem>
+                {!isGuest && (
+                  <>
+                    <Divider />
+                    <MenuItem 
+                      icon={<FaSignOutAlt />} 
+                      onClick={handleLogout}
+                      color="red.500"
+                      _hover={{ bg: 'red.50' }}
+                      _dark={{ _hover: { bg: 'red.900' } }}
+                    >
+                      Đăng xuất
+                    </MenuItem>
+                  </>
+                )}
+              </MenuList>
+            </Menu>
+          </HStack>
         </Flex>
 
-        <Box flex="0 0 auto" zIndex={1001}>
-          <NavActions
-            colorMode={colorMode}
-            handleToggleColorMode={handleToggleColorMode}
-            handleOpenSearch={handleOpenSearch}
-            accessToken={accessToken}
-            onLogin={handleLogin}
-            onLogout={handleLogout}
-            onHistory={handleHistory}
-            userId={userId}
-          />
-        </Box>
-      </Flex>
-
-      <Box display={{ base: 'block', md: 'none' }}>
-        <MobileNav
-          menuItems={menuItems}
-          isOpen={isOpen}
-          isActive={isActive}
-          activeColor={activeColor}
-          textColor={textColor}
-          hoverColor={hoverColor}
-          onNavigate={onClose}
-        />
+        <SearchModal />
       </Box>
-      <SearchModal />
-    </Box>
+
+      <SettingsModal isOpen={isSettingsOpen} onClose={onSettingsClose} />
+
+      {/* Confirmation Modal */}
+      <Modal isOpen={isConfirmOpen} onClose={onConfirmClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Xác nhận xóa dữ liệu</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <Alert status="warning" mb={4}>
+              <AlertIcon />
+              <Box>
+                <AlertTitle>Chú ý!</AlertTitle>
+                <AlertDescription>
+                  Hành động này sẽ xóa toàn bộ dữ liệu bookmark của bạn trên cả Google Drive và máy tính. Hành động này không thể hoàn tác.
+                </AlertDescription>
+              </Box>
+            </Alert>
+            <Text>Bạn có chắc chắn muốn tiếp tục?</Text>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onConfirmClose}>
+              Hủy
+            </Button>
+            <Button colorScheme="red" onClick={handleClearAllData}>
+              Xóa dữ liệu
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+    </>
   );
 };
 

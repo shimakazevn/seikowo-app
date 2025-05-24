@@ -1,17 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { blogConfig } from '../config';
+import { fetchPosts } from '../api';
 
 function TagsList() {
   const [labelsCount, setLabelsCount] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const url = `https://www.googleapis.com/blogger/v3/blogs/${blogConfig.blogId}/posts?key=${blogConfig.apiKey}&maxResults=100`;
-
-    fetch(url)
-      .then(res => res.json())
-      .then(data => {
+    const loadTags = async () => {
+      try {
+        const data = await fetchPosts(100);
         const counts = {};
         (data.items || []).forEach(post => {
           if (post.labels) {
@@ -21,9 +20,14 @@ function TagsList() {
           }
         });
         setLabelsCount(counts);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTags();
   }, []);
   document.title = "Danh sách tags";
   if (loading) return <div className="text-center">Đang tải nhãn...</div>;

@@ -1,23 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { blogConfig } from '../config'; // chứa blogId và apiKey
+import { blogConfig } from '../config';
+import { fetchPages } from '../api';
 
 function Page() {
   const { slug } = useParams(); // slug ví dụ: "video.html"
   const [page, setPage] = useState(null);
 
   useEffect(() => {
-    const url = `https://www.googleapis.com/blogger/v3/blogs/${blogConfig.blogId}/pages?key=${blogConfig.apiKey}`;
-
-    fetch(url)
-      .then((res) => res.json())
-      .then((data) => {
+    const loadPage = async () => {
+      try {
+        const data = await fetchPages();
         const found = data.items?.find((p) => {
           const pageSlug = p.url.split('/').pop();
           return pageSlug === slug;
         });
         setPage(found || null);
-      });
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    loadPage();
   }, [slug]);
 
   if (!page) {
