@@ -1,59 +1,19 @@
 import { openDatabase, withTransaction, saveDataToDB, getDataFromDB } from './indexedDBUtils';
 
 // Import User interface from the store
-import { User } from '../store/useUserStore';
+import type { User } from '../types/global';
 
 // Constants
-const TOKEN_KEY = 'token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const USER_INFO_KEY = 'user_info';
 export const USER_INFO_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-export const TOKEN_CACHE_DURATION = 1 * 60 * 60 * 1000; // 1 hour
+export const TOKEN_CACHE_DURATION = 1 * 60 * 60 * 1000; // 1 hour (This is for Access Token, now handled by securityUtils)
 
 interface TokenData {
   id: string;
   value: string;
   timestamp: number;
 }
-
-// Token management with improved error handling
-export const getToken = async (): Promise<string | null> => {
-  try {
-    return await withTransaction(['userData'], 'readonly', async (tx: IDBTransaction) => {
-      const store = tx.objectStore('userData');
-      const data: TokenData | undefined = await getDataFromDB('userData', TOKEN_KEY);
-
-      if (data && data.timestamp) {
-        const isCacheValid = (Date.now() - data.timestamp) < TOKEN_CACHE_DURATION;
-        return isCacheValid ? data.value : null;
-      }
-      return null;
-    });
-  } catch (error: any) {
-    console.error('Error getting token:', error);
-    // Propagate the error after logging
-    throw error;
-  }
-};
-
-export const setToken = async (token: string): Promise<void> => {
-  if (!token) {
-    throw new Error('Token is required');
-  }
-
-  try {
-    await withTransaction(['userData'], 'readwrite', async (tx: IDBTransaction) => {
-      const store = tx.objectStore('userData');
-      await saveDataToDB('userData', TOKEN_KEY, {
-        value: token,
-        timestamp: Date.now()
-      });
-    });
-  } catch (error: any) {
-    console.error('Error setting token:', error);
-    throw error;
-  }
-};
 
 export const getRefreshToken = async (): Promise<string | null> => {
   try {
@@ -92,7 +52,6 @@ export const clearTokens = async (): Promise<void> => {
     await withTransaction(['userData'], 'readwrite', async (tx: IDBTransaction) => {
       const store = tx.objectStore('userData');
       await Promise.all([
-        store.delete(TOKEN_KEY),
         store.delete(REFRESH_TOKEN_KEY)
       ]);
     });
@@ -216,7 +175,6 @@ export const clearUserSession = async (): Promise<void> => {
     await withTransaction(['userData'], 'readwrite', async (tx: IDBTransaction) => {
       const store = tx.objectStore('userData');
       await Promise.all([
-        store.delete(TOKEN_KEY),
         store.delete(REFRESH_TOKEN_KEY),
         store.delete(USER_INFO_KEY)
       ]);
