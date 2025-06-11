@@ -4,14 +4,105 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Seikowo React</title>
+  <style>
+    /* Prevent flash of white background */
+    html, body, #root {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      transition: none !important;
+    }
+
+    /* Default to dark theme to prevent flash */
+    html, body {
+      background-color: #000000;
+      color: #ffffff;
+    }
+
+    /* Light theme override if system preference is light */
+    @media (prefers-color-scheme: light) {
+      html, body {
+        background-color: #ffffff;
+        color: #000000;
+      }
+    }
+
+    /* Theme-specific overrides */
+    html[data-theme="light"], html[data-theme="light"] body {
+      background-color: #ffffff !important;
+      color: #000000 !important;
+    }
+
+    html[data-theme="dark"], html[data-theme="dark"] body {
+      background-color: #000000 !important;
+      color: #ffffff !important;
+    }
+
+    #root {
+      background-color: inherit;
+    }
+  </style>
   <script>
-    // Check system color scheme preference
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    document.documentElement.classList.toggle('dark', prefersDark);
+    // Immediately set theme based on saved preference or system preference
+    (function() {
+      const savedTheme = localStorage.getItem('theme-preference') || 'auto';
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+      let shouldUseDark = false;
+
+      if (savedTheme === 'dark') {
+        shouldUseDark = true;
+      } else if (savedTheme === 'light') {
+        shouldUseDark = false;
+      } else { // auto
+        shouldUseDark = prefersDark;
+      }
+
+      // Set CSS custom properties immediately
+      const root = document.documentElement;
+      if (shouldUseDark) {
+        root.style.setProperty('--chakra-colors-bg', '#000000');
+        root.style.setProperty('--chakra-colors-text', '#ffffff');
+      } else {
+        root.style.setProperty('--chakra-colors-bg', '#ffffff');
+        root.style.setProperty('--chakra-colors-text', '#000000');
+      }
+
+      // Set data attribute for Chakra UI
+      root.setAttribute('data-theme', shouldUseDark ? 'dark' : 'light');
+
+      // Set Chakra UI color mode in localStorage
+      localStorage.setItem('chakra-ui-color-mode', shouldUseDark ? 'dark' : 'light');
+
+      // Set body styles when DOM is ready
+      function setBodyStyles() {
+        if (document.body) {
+          if (shouldUseDark) {
+            document.body.style.backgroundColor = '#000000';
+            document.body.style.color = '#ffffff';
+          } else {
+            document.body.style.backgroundColor = '#ffffff';
+            document.body.style.color = '#000000';
+          }
+        }
+      }
+
+      // Try to set body styles immediately if body exists
+      if (document.body) {
+        setBodyStyles();
+      } else {
+        // Wait for DOM to be ready
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', setBodyStyles);
+        } else {
+          setBodyStyles();
+        }
+      }
+    })();
   </script>
 </head>
 <body>
-  <div id="root" class="dark-mode"></div>
-  <script type="module" src="/src/main.jsx"></script>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>
