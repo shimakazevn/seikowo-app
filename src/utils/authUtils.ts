@@ -1,9 +1,9 @@
 import {
   getUserInfo,
   backupUserData,
-  clearStoredTokens,
   isTokenValid
 } from '../api/auth';
+import { clearEncryptedData } from './securityUtils';
 import {
   getHistoryData,
   saveHistoryData,
@@ -74,7 +74,7 @@ export const handleLogout = async ({ userId, navigate, toast, onClose }: LogoutP
     userId ? await saveHistoryData('follows', userId, []) : Promise.resolve();
     userId ? await saveHistoryData('reads', userId, []) : Promise.resolve();
     await deleteUserDataFromDB(userId);
-    await clearStoredTokens();
+    await clearEncryptedData();
     // Toast is handled by useAuthNew to avoid duplicates
     // toast({ title: "Đăng xuất thành công", description: "Đang chuyển về trang chủ...", status: "success", duration: 2000, isClosable: true });
     navigate('/', { replace: true });
@@ -101,7 +101,7 @@ export const handleLogin = async ({
     if (!userInfo || !userInfo.sub) {
       throw new Error('Không thể lấy thông tin người dùng');
     }
-    await clearStoredTokens();
+    await clearEncryptedData();
     await deleteUserDataFromDB('guest');
     const mergedData = {
       follows: await getHistoryData('follows', 'guest'),
@@ -153,6 +153,6 @@ export const handleLogin = async ({
       duration: 3000,
       isClosable: true,
     });
-    await clearStoredTokens();
+    await clearEncryptedData();
   }
 };

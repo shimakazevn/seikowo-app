@@ -4,6 +4,8 @@
  * In production: Direct API calls
  */
 
+import useUserStore from '../store/useUserStore';
+
 export interface ApiConfig {
   baseUrl: string;
   maxResults?: number;
@@ -167,4 +169,55 @@ export function getEnvironmentInfo() {
     baseUrl: import.meta.env.BASE_URL,
     prod: import.meta.env.PROD
   };
+}
+
+interface FetchWithAuthOptions extends RequestInit {
+  retryCount?: number;
+}
+
+const MAX_RETRIES = 1; // Only one retry after token refresh
+
+export async function fetchWithAuth(url: string, options?: FetchWithAuthOptions): Promise<Response> {
+  const { retryCount = 0, ...fetchOptions } = options || {};
+  const userStore = useUserStore.getState();
+
+  try {
+    const accessToken = await userStore.getValidAccessToken();
+
+    if (!accessToken) {
+      console.warn('[fetchWithAuth] No valid access token available. Request will proceed without auth.');
+      // Proceed without token if not available, some endpoints might be public
+      return fetch(url, fetchOptions);
+    }
+
+    const headers = {
+      ...fetchOptions.headers,
+      'Authorization': `Bearer ${accessToken}`,
+    };
+
+    const response = await fetch(url, { ...fetchOptions, headers });
+
+    // If response is 401 Unauthorized and it's the first attempt, try to refresh token and retry
+    if (response.status === 401 && retryCount < MAX_RETRIES) {
+      console.warn('[fetchWithAuth] Access token expired or invalid. Attempting to refresh and retry...');
+      const newAccessToken = await userStore.getValidAccessToken(); // This will trigger refresh if needed
+
+      if (newAccessToken) {
+        console.log('[fetchWithAuth] Token refreshed successfully. Retrying request...');
+        return fetchWithAuth(url, { ...options, retryCount: retryCount + 1 });
+      } else {
+        console.error('[fetchWithAuth] Failed to refresh token. User will be logged out.');
+        await userStore.logout(); // Force logout if refresh fails
+        throw new Error('Unauthorized: Failed to refresh token.');
+      }
+    }
+
+    return response;
+  } catch (error: any) {
+    console.error('[fetchWithAuth] Error during authenticated fetch:', error);
+    if (error.message.includes('Unauthorized')) {
+      await userStore.logout(); // Force logout if persistent unauthorized error
+    }
+    throw error;
+  }
 }

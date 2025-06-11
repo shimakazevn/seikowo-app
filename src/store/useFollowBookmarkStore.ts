@@ -26,12 +26,13 @@ interface SyncResult {
 }
 
 interface FavoriteBookmarkStore {
-  favorites: any[];
-  bookmarks: any[];
+  favorites: FavoritePost[];
+  bookmarks: MangaBookmark[];
   loading: boolean;
   error: string | null;
   initialize: (userId: string) => Promise<void>;
   toggleFavorite: (post: Post, userId: string, accessToken: string | null, toast?: ToastFunction) => Promise<boolean>;
+  removeFavorite: (postId: string, userId: string, toast?: ToastFunction) => Promise<boolean>;
   isFavorited: (postId: string) => boolean;
   toggleBookmark: (mangaData: MangaBookmark, userId: string, accessToken: string | null, toast?: ToastFunction) => Promise<boolean>;
   isBookmarked: (mangaId: string) => boolean;
@@ -141,6 +142,47 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>((set, get) => ({
       toast?.({
         title: 'Lỗi',
         description: 'Không thể thực hiện thao tác yêu thích',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      return false;
+    }
+  },
+
+  removeFavorite: async (postId: string, userId: string, toast?: ToastFunction): Promise<boolean> => {
+    if (!userId || userId === 'guest') {
+      toast?.({
+        title: 'Cần đăng nhập',
+        description: 'Vui lòng đăng nhập để sử dụng tính năng yêu thích',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
+      return false;
+    }
+
+    try {
+      const { favorites } = get();
+      const updatedFavorites = favorites.filter(item => item.id !== postId);
+      
+      await saveHistoryData('favorites', userId, updatedFavorites);
+      set({ favorites: updatedFavorites });
+
+      toast?.({
+        title: 'Đã xóa',
+        description: 'Đã xóa bài viết khỏi danh sách yêu thích',
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error removing favorite:', error);
+      toast?.({
+        title: 'Lỗi',
+        description: 'Không thể xóa bài viết khỏi danh sách yêu thích',
         status: 'error',
         duration: 3000,
         isClosable: true,

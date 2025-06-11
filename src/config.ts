@@ -16,6 +16,7 @@ interface BlogConfig {
   clientId: string; // Required for Google OAuth
   clientSecret?: string;
   redirectUri?: string;
+  scope: string;
 }
 
 interface MenuItem {
@@ -33,14 +34,14 @@ export const blogConfig: BlogConfig = {
     linkedin: import.meta.env.VITE_SOCIAL_LINKEDIN,
   },
   blogId: import.meta.env.VITE_BLOG_ID,
-  apiKey: import.meta.env.VITE_GOOGLE_API_KEY,
   clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '', // Provide an empty string as fallback
   clientSecret: import.meta.env.VITE_GOOGLE_CLIENT_SECRET,
   // Dynamic redirect URI based on environment
   redirectUri: import.meta.env.VITE_GOOGLE_REDIRECT_URI ||
     (typeof window !== 'undefined' && window.location.hostname === 'localhost'
       ? 'http://localhost:80'
-      : 'https://seikowo-app.blogspot.com')
+      : 'https://seikowo-app.blogspot.com'),
+  scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive.appdata',
 };
 
 // Admin configuration

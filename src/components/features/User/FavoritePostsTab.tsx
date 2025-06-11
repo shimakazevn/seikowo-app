@@ -14,9 +14,21 @@ import {
   TagLabel,
   Icon,
   Button,
+  IconButton,
+  useToast,
+  useDisclosure,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
 } from '@chakra-ui/react';
-import { FaClock } from 'react-icons/fa';
+import { FaClock, FaTrash } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
+import useFavoriteBookmarkStore from '../../../store/useFollowBookmarkStore';
+import useUserStore from '../../../store/useUserStore';
 import type { FavoritePost } from '../../../types/global';
 
 interface FavoritePostsTabProps {
@@ -36,6 +48,26 @@ const FavoritePostsTab: React.FC<FavoritePostsTabProps> = ({
   accentColor,
   isDark,
 }) => {
+  const toast = useToast();
+  const { userId } = useUserStore();
+  const { removeFavorite } = useFavoriteBookmarkStore();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [selectedPost, setSelectedPost] = React.useState<FavoritePost | null>(null);
+
+  const handleRemoveClick = (post: FavoritePost) => {
+    setSelectedPost(post);
+    onOpen();
+  };
+
+  const handleConfirmRemove = async () => {
+    if (!selectedPost || !userId) return;
+    
+    const success = await removeFavorite(selectedPost.id, userId, toast);
+    if (success) {
+      onClose();
+    }
+  };
+
   return (
     <Box>
       {favoritesPosts.length === 0 ? (
@@ -72,7 +104,7 @@ const FavoritePostsTab: React.FC<FavoritePostsTabProps> = ({
                       </WrapItem>
                     ))}
                   </Wrap>
-                  <HStack fontSize={{ base: "xs", md: "sm" }} color={mutedColor}>
+                  <HStack spacing={2} color={mutedColor}>
                     <Icon as={FaClock} />
                     <Text>{new Date(post.favoriteAt || post.timestamp).toLocaleDateString()}</Text>
                   </HStack>
@@ -82,6 +114,14 @@ const FavoritePostsTab: React.FC<FavoritePostsTabProps> = ({
                         Đọc ngay
                       </Button>
                     </Link>
+                    <IconButton
+                      aria-label="Xóa khỏi yêu thích"
+                      icon={<FaTrash />}
+                      size="sm"
+                      colorScheme="red"
+                      variant="ghost"
+                      onClick={() => handleRemoveClick(post)}
+                    />
                   </HStack>
                 </VStack>
               </CardBody>
@@ -89,6 +129,26 @@ const FavoritePostsTab: React.FC<FavoritePostsTabProps> = ({
           ))}
         </SimpleGrid>
       )}
+
+      {/* Confirmation Modal */}
+      <Modal isOpen={isOpen} onClose={onClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Xác nhận xóa</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <Text>Bạn có chắc chắn muốn xóa bài viết "{selectedPost?.title}" khỏi danh sách yêu thích?</Text>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onClose}>
+              Hủy
+            </Button>
+            <Button colorScheme="red" onClick={handleConfirmRemove}>
+              Xóa
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 };

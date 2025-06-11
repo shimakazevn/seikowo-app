@@ -319,23 +319,11 @@ const EnhancedMangaPostPage: React.FC<EnhancedMangaPostPageProps> = ({
                 fontWeight="bold"
                 color={textColor}
                 lineHeight="1.2"
-                mb={2}
                 noOfLines={3}
               >
                 {title}
               </Text>
 
-              <VStack
-                spacing={1}
-                align="start"
-                fontSize="xs"
-                color={mutedColor}
-              >
-                <Text>{formatDate(publishedDate)}</Text>
-                <HStack spacing={2}>
-                  <Text noOfLines={1}>{author}</Text>
-                </HStack>
-              </VStack>
             </Box>
 
             {/* Cover Image & Actions - Mobile */}
@@ -345,16 +333,59 @@ const EnhancedMangaPostPage: React.FC<EnhancedMangaPostPageProps> = ({
                   src={coverImage}
                   alt={title}
                   w="120px"
-                  h="160px"
+                  h="100%"
                   objectFit="cover"
                   borderRadius="md"
                   shadow="lg"
                   border="1px solid"
                   borderColor={borderColor}
                 />
+                
+              <VStack
+                spacing={1}
+                align="center"
+                fontSize="xs"
+                color={mutedColor}
+                mt={2}
+              >
+                <Text>{formatDate(publishedDate)}</Text>
+              </VStack>
               </Box>
 
               <VStack spacing={3} flex={1} align="stretch">
+              <Box mt={"auto"}>
+                    {tags.slice(0, 3).map((tag, index) => (
+                      <Badge
+                        key={index}
+                        bg={isDark ? 'gray.700' : 'gray.200'}
+                        color={textColor}
+                        px={1.5}
+                        py={0.5}
+                        m={0.5}
+                        fontSize="2xs"
+                        borderRadius="sm"
+                        display="inline-block"
+                        maxW="80px"
+                        isTruncated
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                    {tags.length > 3 && (
+                      <Badge
+                        bg={isDark ? 'gray.600' : 'gray.300'}
+                        color={textColor}
+                        px={1.5}
+                        py={0.5}
+                        m={0.5}
+                        fontSize="2xs"
+                        borderRadius="sm"
+                        display="inline-block"
+                      >
+                        +{tags.length - 3}
+                      </Badge>
+                    )}
+                  </Box>
                 <Button
                   leftIcon={<FaPlay />}
                   bg={accentColor}
@@ -419,78 +450,6 @@ const EnhancedMangaPostPage: React.FC<EnhancedMangaPostPageProps> = ({
               </VStack>
             </HStack>
 
-            {/* Details & Tags - Mobile Compact */}
-            <HStack spacing={3} align="start" w="100%">
-              <Box
-                bg={cardBg}
-                p={3}
-                borderRadius="md"
-                border="1px solid"
-                borderColor={borderColor}
-                flex={1}
-              >
-                <VStack spacing={2} align="stretch">
-                  <Text fontSize="xs" fontWeight="semibold" color={textColor}>
-                    details
-                  </Text>
-                  <VStack spacing={1} align="stretch" fontSize="2xs">
-                    <HStack justify="space-between">
-                      <Text color={mutedColor}>pages:</Text>
-                      <Text color={textColor}>{images.length}</Text>
-                    </HStack>
-                  </VStack>
-                </VStack>
-              </Box>
-
-              <Box
-                bg={cardBg}
-                p={3}
-                borderRadius="md"
-                border="1px solid"
-                borderColor={borderColor}
-                flex={1}
-              >
-                <VStack spacing={2} align="stretch">
-                  <Text fontSize="xs" fontWeight="semibold" color={textColor}>
-                    tags
-                  </Text>
-                  <Box>
-                    {tags.slice(0, 3).map((tag, index) => (
-                      <Badge
-                        key={index}
-                        bg={isDark ? 'gray.700' : 'gray.200'}
-                        color={textColor}
-                        px={1.5}
-                        py={0.5}
-                        m={0.5}
-                        fontSize="2xs"
-                        borderRadius="sm"
-                        display="inline-block"
-                        maxW="80px"
-                        isTruncated
-                      >
-                        {tag}
-                      </Badge>
-                    ))}
-                    {tags.length > 3 && (
-                      <Badge
-                        bg={isDark ? 'gray.600' : 'gray.300'}
-                        color={textColor}
-                        px={1.5}
-                        py={0.5}
-                        m={0.5}
-                        fontSize="2xs"
-                        borderRadius="sm"
-                        display="inline-block"
-                      >
-                        +{tags.length - 3}
-                      </Badge>
-                    )}
-                  </Box>
-                </VStack>
-              </Box>
-            </HStack>
-
             {/* Preview Section - Mobile Optimized */}
             <Box w="100%">
               <Text
@@ -499,7 +458,7 @@ const EnhancedMangaPostPage: React.FC<EnhancedMangaPostPageProps> = ({
                 color={textColor}
                 mb={3}
               >
-                chapter preview ({images.length} pages)
+                {images.length} pages
               </Text>
 
               {/* Mobile Horizontal Scroll - Fixed Overflow */}

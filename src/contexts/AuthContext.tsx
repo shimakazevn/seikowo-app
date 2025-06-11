@@ -7,7 +7,7 @@ import * as securityUtils from '../utils/securityUtils';
 // Simplified AuthContextType to avoid useAuth hook
 interface AuthContextType {
   user: any;
-  isLoading: boolean;
+  isLoading: boolean; // Reflects if useUserStore is ready
   isAuthenticated: boolean;
   error: string | null;
   login: (accessToken: string) => Promise<void>;
@@ -38,86 +38,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated,
     logout: storeLogout,
     initializeUser,
-    storeReady
+    storeReady,
+    accessToken, // Get accessToken from store for syncData
+    setUser: storeSetUser, // Use setUser from store directly
   } = useUserStore();
 
   const [uploadToken, setUploadToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null); // Local error state for AuthProvider
 
-  // Initialize auth state when component mounts
+  // Effect to ensure useUserStore is initialized
   useEffect(() => {
-    const initAuth = async () => {
-      if (isInitialized) return;
-      
-      try {
-        console.log('[AuthProvider] Starting auth initialization...');
-        setIsLoading(true);
-
-        // First try to get token
-        const token = await securityUtils.getAndDecryptToken();
-        console.log('[AuthProvider] Token status:', token ? 'exists' : 'not found');
-
-        // Then try to get user data
-        const userData = await securityUtils.getAndDecryptUserData();
-        console.log('[AuthProvider] User data status:', userData ? 'exists' : 'not found');
-
-        // If we have token but no user data, try to get user info from Google
-        if (token && !userData) {
-          console.log('[AuthProvider] Token exists but no user data, attempting to fetch user info...');
-          try {
-            const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            
-            if (response.ok) {
-              const googleUserData = await response.json();
-              console.log('[AuthProvider] Successfully fetched user info from Google');
-              
-              // Save the user data
-              const success = await securityUtils.encryptAndStoreUserData(googleUserData);
-              if (success) {
-                console.log('[AuthProvider] Successfully saved user data');
-                const success = await initializeUser();
-                console.log('[AuthProvider] Auth initialization result:', { success, storeReady });
-                if (success) {
-                  setIsInitialized(true);
-                  return;
-                }
-              }
-            }
-          } catch (error) {
-            console.error('[AuthProvider] Error fetching user info:', error);
-          }
+    console.log('[AuthProvider] useEffect started. Dependencies: storeReady=', storeReady, ', isAuthenticated=', isAuthenticated);
+    let isMounted = true;
+    // Only attempt to initialize if the store is not ready and user is not authenticated
+    // This prevents re-initialization loops when no user data is found
+    if (!storeReady && !isAuthenticated && isMounted) {
+      console.log('[AuthProvider] EFFECT TRIGGERED: storeReady is false AND isAuthenticated is false, attempting initialization.');
+      initializeUser().then(success => {
+        if (!success && isMounted) {
+          console.log('[AuthProvider] initial initializeUser failed.');
+          // If initialization fails, the store should already reflect the unauthenticated state.
+          // No need to call storeLogout here, as it could trigger another loop.
         }
-
-        // If we have both token and user data, or if we couldn't recover user data
-        const success = await initializeUser();
-        console.log('[AuthProvider] Auth initialization result:', { success, storeReady });
-        
-        if (!success) {
-          console.log('[AuthProvider] Auth initialization failed, clearing state...');
-          // Only clear token if we couldn't recover user data
-          if (!userData) {
-            await storeLogout();
-          }
-        }
-      } catch (err) {
-        console.error('[AuthProvider] Error initializing auth:', err);
-        setError(err instanceof Error ? err.message : 'Failed to initialize auth');
-        await storeLogout();
-      } finally {
-        setIsLoading(false);
-        setIsInitialized(true);
-      }
+      });
+    }
+    return () => {
+      isMounted = false;
     };
+  }, [storeReady, isAuthenticated, initializeUser, storeLogout]); // Keep dependencies minimal and relevant
 
-    initAuth();
-  }, [initializeUser, storeLogout, isInitialized]);
-
-  // Show loading state while initializing
-  if (isLoading || !isInitialized) {
+  // Show loading state while useUserStore is not ready
+  if (!storeReady) {
     return (
       <Center h="100vh">
         <Spinner size="xl" color="blue.500" />
@@ -126,12 +77,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }
 
   // Show error state if initialization failed
-  if (error) {
+  if (localError) {
     return (
       <Center h="100vh">
         <VStack spacing={4}>
           <Text color="red.500">Authentication Error</Text>
-          <Text fontSize="sm" color="gray.500">{error}</Text>
+          <Text fontSize="sm" color="gray.500">{localError}</Text>
           <Button onClick={() => window.location.reload()}>Retry</Button>
         </VStack>
       </Center>
@@ -140,51 +91,58 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const contextValue: AuthContextType = {
     user,
-    isLoading,
+    isLoading: !storeReady, // Reflects the store's readiness
     isAuthenticated,
-    error,
-    login: async (accessToken: string) => {
+    error: localError,
+    login: async (newAccessToken: string) => {
       try {
-        setIsLoading(true);
-        const success = await initializeUser();
-        if (!success) {
-          throw new Error('Failed to initialize user after login');
-        }
+        setLocalError(null);
+        // When login is called, we directly set the user and access token in the store
+        // We assume user data will be fetched and passed to storeSetUser within useAuthNew.ts
+        // For now, we pass null for userData as useAuthNew.ts will handle getting it
+        // The storeSetUser will then trigger restoreAndSaveUserData from Google Drive
+        await storeSetUser(user, newAccessToken); // Pass current user and new access token
       } catch (err) {
         console.error('[AuthProvider] Login error:', err);
-        setError(err instanceof Error ? err.message : 'Login failed');
+        setLocalError(err instanceof Error ? err.message : 'Login failed');
         throw err;
-      } finally {
-        setIsLoading(false);
       }
     },
     logout: storeLogout,
     refreshAuth: async () => {
       try {
-        setIsLoading(true);
+        setLocalError(null);
+        // Force re-initialization of user store to refresh auth status
         await initializeUser();
       } catch (err) {
         console.error('[AuthProvider] Refresh error:', err);
-        setError(err instanceof Error ? err.message : 'Failed to refresh auth');
-      } finally {
-        setIsLoading(false);
+        setLocalError(err instanceof Error ? err.message : 'Failed to refresh auth');
       }
     },
-    clearError: () => setError(null),
+    clearError: () => setLocalError(null),
     forceRefresh: async () => {
       try {
-        setIsLoading(true);
-        await initializeUser();
+        setLocalError(null);
+        await initializeUser(); // Force re-initialization
       } catch (err) {
         console.error('[AuthProvider] Force refresh error:', err);
-        setError(err instanceof Error ? err.message : 'Failed to force refresh');
-      } finally {
-        setIsLoading(false);
+        setLocalError(err instanceof Error ? err.message : 'Failed to force refresh');
       }
     },
     syncData: async () => {
-      // Implementation would go here
-      console.log('[AuthProvider] syncData called');
+      try {
+        setLocalError(null);
+        // syncUserData in useUserStore requires accessToken and userId
+        if (accessToken && user?.id) {
+          await useUserStore.getState().syncUserData(accessToken, user.id);
+        } else {
+          throw new Error("Cannot sync data: Access token or user ID is missing.");
+        }
+      } catch (err) {
+        console.error('[AuthProvider] Sync data error:', err);
+        setLocalError(err instanceof Error ? err.message : 'Failed to sync data');
+        throw err;
+      }
     },
     exportData: async () => {
       // Implementation would go here
@@ -225,8 +183,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   fallback
 }) => {
   // Use store directly to avoid useAuth hook spam
-  const { isAuthenticated } = useUserStore();
-  const isLoading = false; // Simplified for now
+  const { isAuthenticated, storeReady } = useUserStore();
+  const isLoading = !storeReady; // Use storeReady to determine loading state
 
   if (isLoading) {
     return (

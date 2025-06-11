@@ -18,7 +18,9 @@ const AppInitializer: React.FC<AppInitializerProps> = ({ children }) => {
   const errorColor = useColorModeValue('red.500', 'red.300');
 
   useEffect(() => {
+    console.log('[AppInitializer] useEffect triggered. isInitialized:', isInitialized, 'isInitializing:', isInitializing);
     if (!isInitialized && !isInitializing) {
+      console.log('[AppInitializer] Calling initialize()...');
       initialize();
         }
   }, [isInitialized, isInitializing, initialize]);

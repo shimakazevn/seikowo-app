@@ -3,14 +3,7 @@ import { IconButton, Button, useToast, Box, useColorModeValue } from '@chakra-ui
 import { useGoogleLogin } from '@react-oauth/google';
 import { MdLogin, MdLogout } from 'react-icons/md';
 import { useAuth } from '../../../hooks/useAuthNew';
-
-// Google OAuth scopes
-const GOOGLE_SCOPES = [
-  'https://www.googleapis.com/auth/userinfo.profile',
-  'https://www.googleapis.com/auth/userinfo.email',
-  'https://www.googleapis.com/auth/drive.file',
-  'https://www.googleapis.com/auth/blogger'
-].join(' ');
+import { blogConfig } from '../../../config'; // Import blogConfig
 
 interface LoginButtonProps {
   variant?: 'icon' | 'button' | 'google' | 'google-compact' | 'google-full' | 'google-floating';
@@ -110,7 +103,7 @@ export const LoginButton = ({
       });
       onError?.(error);
     },
-    scope: GOOGLE_SCOPES,
+    scope: blogConfig.scope, // Use scope from blogConfig
     flow: 'implicit',
     prompt: 'consent'
   });
@@ -226,6 +219,13 @@ export const LoginButton = ({
         };
     }
   };
+
+  console.log('[LoginButton] Render:', {
+    isLoading: isLoading,
+    authLoading: authLoading,
+    isProcessing: isProcessing,
+    isAuthenticated: isAuthenticated
+  });
 
   // Google style button
   if (variant.startsWith('google')) {

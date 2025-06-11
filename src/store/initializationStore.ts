@@ -48,14 +48,16 @@ const useInitializationStore = create<InitializationState>((set, get) => ({
         }),
 
         // Initialize user store
-        useUserStore.getState().initializeUser().then(() => {
+        // We don't need to check the boolean return of initializeUser directly here.
+        // Its success is determined by useUserStore.getState().storeReady after the call.
+        await useUserStore.getState().initializeUser().then(() => {
           set(state => ({
             initializationProgress: { ...state.initializationProgress, user: true }
           }));
-          return true;
+          return true; // Mark as successful for this promise chain
         }).catch(error => {
           console.error('[InitializationStore] User store initialization failed:', error);
-          return false;
+          return false; // Mark as failed for this promise chain if an actual error occurred
         })
       ]);
 
@@ -66,12 +68,12 @@ const useInitializationStore = create<InitializationState>((set, get) => ({
 
       // Get user store state after initialization
       const userStore = useUserStore.getState();
-      const storeReady = userStore.storeReady;
+      const userStoreReady = userStore.storeReady; // Use specific variable name for clarity
 
       // Consider initialization successful if:
       // 1. Database initialized successfully AND
-      // 2. User store is ready (regardless of authentication state)
-      const success = dbResult && storeReady;
+      // 2. User store is ready (regardless of authentication state - it should be 'ready' even if user is not logged in)
+      const success = dbResult && userStoreReady;
       
       set({
         isInitialized: success,

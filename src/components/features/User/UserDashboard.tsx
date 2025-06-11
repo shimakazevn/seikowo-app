@@ -70,6 +70,7 @@ import type { User, BlogPost, FavoritePost, MangaBookmark } from '../../../types
 // Import new tab components
 import FavoritePostsTab from './FavoritePostsTab';
 import BookmarkedMangaTab from './BookmarkedMangaTab';
+import UserCommentsTab from '../../Settings/Profile/UserCommentsTab';
 
 interface UserDashboardProps {
   user: User;
@@ -102,7 +103,25 @@ const USER_DASHBOARD_TABS: UserDashboardTab[] = [
     color: '#20b2aa', // LightSeaGreen
     component: BookmarkedMangaTab,
   },
+  {
+    id: 'user-comments',
+    label: 'Bình luận của bạn',
+    icon: FaComment,
+    description: 'Quản lý các bình luận đã đăng',
+    color: '#3182ce', // Blue
+    component: UserCommentsTab,
+  },
 ];
+
+interface TabComponentProps {
+  cardBg: string;
+  textColor: string;
+  mutedColor: string;
+  accentColor: string;
+  isDark: boolean;
+  favoritesPosts?: FavoritePost[];
+  bookmarkedPosts?: MangaBookmark[];
+}
 
 const UserDashboard: React.FC<UserDashboardProps> = ({ user, accessToken }) => {
   const { colorMode } = useColorMode();

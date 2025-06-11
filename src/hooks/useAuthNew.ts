@@ -28,7 +28,9 @@ export const useAuth = () => {
     initializeUser,
     setUser,
     logout: storeLogout,
-    storeReady
+    storeReady,
+    accessToken: storeAccessToken,
+    userId: storeUserId,
   } = useUserStore();
 
   const login = useCallback(async (accessToken?: string) => {
@@ -74,6 +76,11 @@ export const useAuth = () => {
         isLoading: false
       }));
 
+      // This ensures data is synchronized upon successful login or session restoration
+      if (storeIsAuthenticated && storeAccessToken && storeUserId) {
+        useUserStore.getState().syncUserData(storeAccessToken, storeUserId);
+      }
+
     } catch (error: any) {
       console.error('Login error:', error);
       setState(prev => ({
@@ -90,7 +97,7 @@ export const useAuth = () => {
         isClosable: true
       });
     }
-  }, [setUser, toast, initializeUser, storeUser]);
+  }, [setUser, toast, initializeUser, storeUser, storeIsAuthenticated, storeReady, storeAccessToken, storeUserId]);
 
   const logout = useCallback(async () => {
     try {
@@ -113,18 +120,21 @@ export const useAuth = () => {
   }, [navigate, storeLogout]);
 
   useEffect(() => {
-    if (storeReady && storeIsAuthenticated) {
+    // Once the user store is ready, update the local auth state
+    if (storeReady) {
       setState(prev => ({
         ...prev,
         user: storeUser,
         isAuthenticated: storeIsAuthenticated,
-        isLoading: false
+        isLoading: false, // Set isLoading to false once store is ready, regardless of authentication status
       }));
       // Trigger syncUserData after authentication and store is ready
       // This ensures data is synchronized upon successful login or session restoration
-      useUserStore.getState().syncUserData();
+      if (storeIsAuthenticated && storeAccessToken && storeUserId) {
+        useUserStore.getState().syncUserData(storeAccessToken, storeUserId);
+      }
     }
-  }, [storeUser, storeIsAuthenticated, storeReady]);
+  }, [storeUser, storeIsAuthenticated, storeReady, storeAccessToken, storeUserId]);
 
   return {
     ...state,

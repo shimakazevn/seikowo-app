@@ -113,7 +113,6 @@ const AuthTest: React.FC = () => {
       // Test 5: Environment variables
       const envTest = {
         hasClientId: !!import.meta.env.VITE_GOOGLE_CLIENT_ID,
-        hasApiKey: !!import.meta.env.VITE_GOOGLE_API_KEY,
         clientIdPreview: import.meta.env.VITE_GOOGLE_CLIENT_ID ? 
           import.meta.env.VITE_GOOGLE_CLIENT_ID.substring(0, 20) + '...' : null
       };

@@ -1,8 +1,8 @@
 import { blogConfig } from './config';
 import { getCachedData, setCachedData, CACHE_KEYS } from './utils/cache';
 import { ErrorTypes, AppError, handleError } from './utils/errorHandler'; // Assuming errorHandler is now TS
-import { getValidToken } from './api/auth'; // Assuming auth is now TS
 import { DEFAULT_API_CONFIG } from './utils/apiUtils';
+import useUserStore from './store/useUserStore'; // Import useUserStore
 
 // Re-export error handling
 export { ErrorTypes, AppError, handleError };
@@ -327,7 +327,7 @@ export const getRSSFeedItemsBySearch = async (keyword: string): Promise<RssItem[
 
 export const fetchPages = async (): Promise<PageResponse> => {
   try {
-    const token = await getValidToken();
+    const token = await useUserStore.getState().getValidAccessToken();
     const response = await fetch(
       `https://www.googleapis.com/blogger/v3/blogs/${blogConfig.blogId}/pages?key=${blogConfig.apiKey}`,
       {
@@ -353,7 +353,7 @@ export const fetchPages = async (): Promise<PageResponse> => {
 
 export const fetchPosts = async (maxResults: number = 10): Promise<PostResponse> => {
   try {
-    const token = await getValidToken();
+    const token = await useUserStore.getState().getValidAccessToken();
     const response = await fetch(
       `https://www.googleapis.com/blogger/v3/blogs/${blogConfig.blogId}/posts?maxResults=${maxResults}&key=${blogConfig.apiKey}`,
       {
@@ -379,7 +379,7 @@ export const fetchPosts = async (maxResults: number = 10): Promise<PostResponse>
 
 export const fetchPostsByTag = async (label: string): Promise<PostResponse> => {
   try {
-    const token = await getValidToken();
+    const token = await useUserStore.getState().getValidAccessToken();
     const response = await fetch(
       `https://www.googleapis.com/blogger/v3/blogs/${blogConfig.blogId}/posts?labels=${encodeURIComponent(label)}&key=${blogConfig.apiKey}`,
       {
@@ -411,7 +411,7 @@ export async function searchPosts(params: {
   maxResults: number;
 }): Promise<PostResponse> {
   try {
-    const token = await getValidToken();
+    const token = await useUserStore.getState().getValidAccessToken();
     if (!token) {
       throw new AppError(
         ErrorTypes.AUTH_ERROR,

@@ -23,8 +23,10 @@ import {
   getDataFromDB
 } from '../utils/indexedDBUtils';
 import { clearCachedData, CACHE_KEYS } from '../utils/cache';
-import { backupUserData, isTokenValid, refreshToken, restoreUserData } from '../api/auth';
+import { backupUserData, refreshToken, restoreUserData } from '../api/auth';
 import type { User, UserData } from '../types/global';
+
+console.log('[useUserStore.ts] File loaded. Initial localStorage value for store-key:', localStorage.getItem('user-storage'));
 
 // Initial state
 const initialState = {
@@ -45,6 +47,25 @@ const initialState = {
   hasUserId: false,
 };
 
+// Store state type
+type UserStoreState = {
+  user: User | null;
+  isAuthenticated: boolean;
+  is2FAEnabled: boolean;
+  is2FAVerified: boolean;
+  lastSyncTime: number | null;
+  syncStatus: 'idle' | 'loading' | 'success' | 'error';
+  syncError: string | null;
+  isOffline: boolean;
+  userId: string | null;
+  storeReady: boolean;
+  hasUserId: boolean;
+  accessToken: string | null;
+  hasAccessToken: boolean;
+  temp2FASecret: string | null;
+  temp2FACode: string | null;
+};
+
 // Store state interface
 type UserStore = typeof initialState & {
   // Actions
@@ -56,7 +77,7 @@ type UserStore = typeof initialState & {
   verifyAndEnable2FA: (code: string) => Promise<boolean>;
   verify2FA: (code: string) => Promise<boolean>;
   disable2FA: (code: string) => Promise<boolean>;
-  syncUserData: (accessToken?: string, userId?: string) => Promise<boolean>;
+  syncUserData: (accessToken: string, userId: string) => Promise<boolean>;
   setOfflineStatus: (isOffline: boolean) => void;
   updateProfile: (updates: Partial<User>) => Promise<boolean>;
   clearUserData: () => Promise<void>;
@@ -67,7 +88,19 @@ type UserStore = typeof initialState & {
 };
 
 interface StorageData {
-  state: UserStore;
+  state: {
+    user: User | null;
+    isAuthenticated: boolean;
+    is2FAEnabled: boolean;
+    is2FAVerified: boolean;
+    lastSyncTime: number | null;
+    syncStatus: 'idle' | 'loading' | 'success' | 'error';
+    syncError: string | null;
+    isOffline: boolean;
+    userId: string | null;
+    storeReady: boolean;
+    hasUserId: boolean;
+  };
   version: number;
   timestamp: number;
 }
@@ -80,18 +113,33 @@ const useUserStore = create<UserStore>()(
       ...initialState,
 
       initializeUser: async () => {
+        const currentStoreState = get();
+        console.log('[useUserStore] initializeUser called. Current storeReady:', currentStoreState.storeReady);
+
+        // Only skip if store is already ready, authenticated, AND has an accessToken AND has user data
+        if (currentStoreState.storeReady && 
+            currentStoreState.isAuthenticated && 
+            currentStoreState.hasAccessToken && 
+            currentStoreState.user) {
+          console.log('[useUserStore] Store already ready and fully authenticated. Skipping initialization.');
+          return true;
+        }
+
         try {
-          // Get current state before initialization
-          const currentState = get();
+          // Load user data and token
+          const [userData, accessToken] = await Promise.all([
+            getAndDecryptUserData<UserData>(),
+            getAndDecryptToken()
+          ]);
+          
+          console.log('[useUserStore] initializeUser - decrypted data:', {
+            hasUserData: !!userData,
+            hasToken: !!accessToken
+          });
 
-          // Load user data with proper type
-          const userData = await getAndDecryptUserData<UserData>();
-
-          // Load access token
-          const accessToken = await getAndDecryptToken();
-
-          if (userData) {
-            // Convert UserData to User
+          // Case 1: Both user data and token exist
+          if (userData && accessToken) {
+            console.log('[useUserStore] Both user data and token found, setting authenticated state');
             const user: User = {
               sub: userData.sub,
               name: userData.name,
@@ -103,54 +151,106 @@ const useUserStore = create<UserStore>()(
               locale: userData.locale,
               is2FAEnabled: userData.is2FAEnabled,
               twoFactorSecret: userData.twoFactorSecret,
-              isAuthenticated: userData.isAuthenticated,
+              isAuthenticated: true,
               id: userData.id || userData.sub,
               updatedAt: userData.updatedAt,
-              timestamp: userData.timestamp
+              timestamp: Number(Date.now())
             };
 
             const userId = user.sub || user.id;
-            console.log('[useUserStore] Setting user data:', { 
-              userId,
-              hasSub: !!user.sub,
-              hasId: !!user.id,
-              hasToken: !!accessToken,
-              userData
-            });
-
-            const newState = {
-              user: user,
+            set({
+              user,
               isAuthenticated: true,
-              accessToken: accessToken || null,
+              accessToken,
               storeReady: true,
-              hasUserId: !!userId,
-              userId: userId || null,
-              hasAccessToken: !!accessToken
-            };
-
-            set(newState);
+              hasUserId: true,
+              userId,
+              hasAccessToken: true
+            });
             return true;
           }
 
+          // Case 2: Only token exists but no user data
+          if (!userData && accessToken) {
+            console.log('[useUserStore] Token exists but no user data found. Attempting to restore user data...');
+            try {
+              // Try to get user info from Google API
+              const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+              });
+
+              if (response.ok) {
+                const userInfo = await response.json();
+                console.log('[useUserStore] Retrieved user info from Google:', userInfo);
+
+                const user: User = {
+                  sub: userInfo.sub,
+                  name: userInfo.name,
+                  given_name: userInfo.given_name,
+                  family_name: userInfo.family_name,
+                  picture: userInfo.picture,
+                  email: userInfo.email,
+                  email_verified: userInfo.email_verified,
+                  locale: userInfo.locale,
+                  is2FAEnabled: false,
+                  twoFactorSecret: null,
+                  isAuthenticated: true,
+                  id: userInfo.sub,
+                  updatedAt: new Date().toISOString(),
+                  timestamp: Number(Date.now())
+                };
+
+                // Save user data
+                await encryptAndStoreUserData(user);
+                
+                const userId = user.sub;
+                set({
+                  user,
+                  isAuthenticated: true,
+                  accessToken,
+                  storeReady: true,
+                  hasUserId: true,
+                  userId,
+                  hasAccessToken: true
+                });
+
+                // Restore data from Drive
+                await get().restoreAndSaveUserData(accessToken, userId);
+                return true;
+              } else {
+                console.log('[useUserStore] Failed to get user info from Google, logging out...');
+                await get().logout();
+                return false;
+              }
+            } catch (error) {
+              console.error('[useUserStore] Error restoring user data:', error);
+              await get().logout();
+              return false;
+            }
+          }
+
+          // Case 3: Neither user data nor token exists
+          console.log('[useUserStore] No user data or token found, setting unauthenticated state');
           set({
+            user: null,
+            isAuthenticated: false,
+            accessToken: null,
             storeReady: true,
             hasUserId: false,
-            isAuthenticated: false,
-            user: null,
             userId: null,
-            accessToken: null,
             hasAccessToken: false
           });
-          return false;
-        } catch (error: any) {
-          console.error('[useUserStore] Error initializing user:', error);
+          return true;
+
+        } catch (error) {
+          console.error('[useUserStore] Error during initialization:', error);
           set({
+            user: null,
+            isAuthenticated: false,
+            accessToken: null,
             storeReady: true,
             hasUserId: false,
-            isAuthenticated: false,
-            user: null,
             userId: null,
-            accessToken: null,
             hasAccessToken: false
           });
           return false;
@@ -158,13 +258,16 @@ const useUserStore = create<UserStore>()(
       },
 
       setUser: async (userData: User | null, accessToken: string | null) => {
+        console.log('[useUserStore] setUser called with userData:', userData, 'and accessToken:', accessToken ? 'exists' : 'not found');
         try {
           if (userData) {
             const userId = userData.id || userData.sub;
+            console.log('[useUserStore] setUser - derived userId:', userId);
             if (!userId) {
               console.error('[useUserStore] User ID is null or undefined.');
               return false;
             }
+            const validUserId: string = userId; // Ensure userId is a string
 
             const userDataToSave: UserData = {
               ...userData,
@@ -176,6 +279,7 @@ const useUserStore = create<UserStore>()(
               syncStatus: userData.syncStatus || 'idle',
             };
 
+            console.log('[useUserStore] setUser - saving userData to DB for userId:', userId);
             await saveUserData(userId, userDataToSave);
 
             set({
@@ -189,17 +293,18 @@ const useUserStore = create<UserStore>()(
               syncStatus: userDataToSave.syncStatus,
             });
 
-            if (accessToken) {
-              await encryptAndStoreToken(accessToken);
-              set({ accessToken: accessToken, hasAccessToken: true });
+            if (accessToken && typeof accessToken === 'string' && typeof validUserId === 'string') {
+              const definiteAccessToken: string = accessToken!; // Explicitly capture the narrowed type with non-null assertion
+              await encryptAndStoreToken(definiteAccessToken);
+              set({ accessToken: definiteAccessToken, hasAccessToken: true });
               // Attempt to restore user data from Google Drive
-              await get().restoreAndSaveUserData(accessToken, userId);
+              await get().restoreAndSaveUserData(definiteAccessToken, validUserId);
             }
 
             return true;
           } else {
             set({ user: null, isAuthenticated: false, userId: null, hasUserId: false });
-            if (accessToken) {
+            if (accessToken && typeof accessToken === 'string') {
               await encryptAndStoreToken(accessToken);
               set({ accessToken: accessToken, hasAccessToken: true });
             }
@@ -350,15 +455,11 @@ const useUserStore = create<UserStore>()(
       },
 
       // Sync user data to cloud (e.g., Firebase, backend)
-      syncUserData: async (passedAccessToken?: string, passedUserId?: string) => {
+      syncUserData: async (accessToken: string, userId: string) => {
         set({ syncStatus: 'loading', syncError: null });
         try {
           const user = get().user;
           if (!user) throw new Error('User not authenticated for sync');
-          const userId = passedUserId || user.id || user.sub;
-          if (!userId) throw new Error('User ID not found');
-          const accessToken = passedAccessToken || get().accessToken;
-          if (!accessToken) throw new Error('Access token not found');
 
           // Get user data to backup
           const [readPosts, favoritePosts, mangaBookmarks] = await Promise.all([
@@ -368,7 +469,7 @@ const useUserStore = create<UserStore>()(
           ]);
 
           // Backup to Google Drive
-          await backupUserData(accessToken, userId, {
+          await backupUserData(userId, {
             readPosts: Array.isArray(readPosts) ? readPosts : [],
             favoritePosts: Array.isArray(favoritePosts) ? favoritePosts : [],
             mangaBookmarks: Array.isArray(mangaBookmarks) ? mangaBookmarks : []
@@ -455,37 +556,60 @@ const useUserStore = create<UserStore>()(
 
       getValidAccessToken: async () => {
         try {
+          console.log('[useUserStore] Starting getValidAccessToken...');
           const storedAccessToken = await getAndDecryptToken();
+          
           if (!storedAccessToken) {
             console.log('[useUserStore] No stored access token found.');
             return null;
           }
 
-          const isValid = await isTokenValid(storedAccessToken);
-          if (isValid) {
-            console.log('[useUserStore] Stored access token is valid.');
-            return storedAccessToken;
+          console.log('[useUserStore] Found stored access token:', {
+            tokenPreview: storedAccessToken.substring(0, 10) + '...',
+            tokenLength: storedAccessToken.length
+          });
+
+          // Try to validate token by making a test request
+          try {
+            const testResponse = await fetch('https://www.googleapis.com/oauth2/v1/tokeninfo', {
+              headers: { 'Authorization': `Bearer ${storedAccessToken}` }
+            });
+            
+            if (testResponse.ok) {
+              const tokenInfo = await testResponse.json();
+              console.log('[useUserStore] Token validation successful:', {
+                expiresIn: tokenInfo.expires_in,
+                scope: tokenInfo.scope
+              });
+              return storedAccessToken;
+            } else {
+              console.log('[useUserStore] Token validation failed, attempting refresh...');
+            }
+          } catch (validationError) {
+            console.log('[useUserStore] Token validation error, attempting refresh:', validationError);
           }
 
-          console.log('[useUserStore] Stored access token is expired, attempting refresh...');
           const refreshTokenValue = await getRefreshToken();
           if (!refreshTokenValue) {
             console.warn('[useUserStore] No refresh token available');
             return null;
           }
+
+          console.log('[useUserStore] Attempting to refresh token...');
           const newAccessToken = await refreshToken(refreshTokenValue);
+          
           if (newAccessToken) {
+            console.log('[useUserStore] Token refresh successful, storing new token...');
             await encryptAndStoreToken(newAccessToken);
             set({ accessToken: newAccessToken, hasAccessToken: true });
-            console.log('[useUserStore] Token refreshed and stored.');
             return newAccessToken;
-          } else {
-            console.warn('[useUserStore] Could not refresh token. User needs to re-authenticate.');
-            await get().logout();
-            return null;
           }
+
+          console.warn('[useUserStore] Could not refresh token. User needs to re-authenticate.');
+          await get().logout();
+          return null;
         } catch (error) {
-          console.error('[useUserStore] Error getting valid access token:', error);
+          console.error('[useUserStore] Error in getValidAccessToken:', error);
           await get().logout();
           return null;
         }
@@ -531,7 +655,7 @@ const useUserStore = create<UserStore>()(
       restoreAndSaveUserData: async (accessToken: string, userId: string) => {
         set({ syncStatus: 'loading', syncError: null });
         try {
-          const restoredData = await restoreUserData(accessToken, userId);
+          const restoredData = await restoreUserData(userId);
 
           if (restoredData) {
             console.log('[useUserStore] Restored data from Google Drive:', restoredData);
@@ -562,7 +686,10 @@ const useUserStore = create<UserStore>()(
 
             set({ lastSyncTime: Date.now(), syncStatus: 'success' });
             // Call syncUserData to ensure data is pushed to Google Drive after restoration
-            await get().syncUserData(accessToken, userId);
+            // Create explicitly typed local variables to satisfy linter
+            const syncAccessToken: string = accessToken;
+            const syncUserId: string = userId;
+            await get().syncUserData(syncAccessToken, syncUserId);
             return true;
           } else {
             console.log('[useUserStore] No data to restore from Google Drive or file not found.');
@@ -580,7 +707,7 @@ const useUserStore = create<UserStore>()(
     {
       name: STORE_KEY,
       storage: {
-        getItem: (name: string) => {
+        getItem: (name: string): StorageValue<UserStoreState> | null => {
           const str = localStorage.getItem(name);
           if (!str) return null;
           try {
@@ -620,17 +747,22 @@ const useUserStore = create<UserStore>()(
             return null;
           }
         },
-        setItem: (name: string, value: any) => {
+        setItem: (name: string, value: StorageValue<UserStoreState>) => {
           localStorage.setItem(name, JSON.stringify(value));
         },
         removeItem: (name: string) => localStorage.removeItem(name),
       },
       version: 1,
-      migrate: (persistedState: any, version) => {
+      migrate: (persistedState: unknown, version: number): UserStoreState => {
         if (version === 0) {
           console.log('Migrating user store from version 0 to 1');
+          // Add any migration logic here if needed
+          return {
+            ...initialState,
+            ...(persistedState as Partial<UserStoreState>)
+          };
         }
-        return persistedState;
+        return persistedState as UserStoreState;
       },
     }
   )
