@@ -229,7 +229,7 @@ const EnhancedMangaPostPage: React.FC<EnhancedMangaPostPageProps> = ({
       // Download all images and add to zip
       const downloadPromises = images.map(async (imageUrl, index) => {
         try {
-          const response = await fetch(imageUrl);
+          const response = await fetch('https://images.weserv.nl/?url='+imageUrl);
           const blob = await response.blob();
           const extension = imageUrl.split('.').pop()?.split('?')[0] || 'jpg';
           const fileName = `page_${String(index + 1).padStart(3, '0')}.${extension}`;
