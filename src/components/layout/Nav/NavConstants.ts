@@ -1,5 +1,5 @@
 import React from 'react';
-import { MenuItem } from '../../types/navigation';
+import { MenuItem } from '../../../types/navigation';
 import {
   SettingsIcon,
   InfoIcon,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Box,
   Text,
@@ -9,22 +9,45 @@ import {
   useToast,
   useColorMode,
   Tooltip,
+  Avatar,
 } from '@chakra-ui/react';
-import { FaComments, FaExternalLinkAlt, FaSync } from 'react-icons/fa';
-import { blogConfig } from '../../config';
+import { FaComments, FaExternalLinkAlt, FaSync, FaComment } from 'react-icons/fa';
+import { blogConfig } from '../../../config';
+
+interface Comment {
+  id: string;
+  author: {
+    displayName: string;
+    image?: {
+      url: string;
+    };
+  };
+  content: string;
+  published: string;
+  updated?: string;
+  parentId?: string;
+  replies?: Comment[];
+  isReply?: boolean;
+  parentComment?: Comment;
+}
+
+interface CommentsData {
+  totalItems: number;
+  items: Comment[];
+}
 
 // Component for rendering a comment with its replies
 const CommentWithReplies = ({
   comment,
-  level = 0,
-  isLast = false,
-  isNewComment = false,
+  level,
+  isLast,
+  isNewComment,
   isDark,
   textColor,
   mutedColor,
-  accentColor
+  accentColor,
 }: {
-  comment: any;
+  comment: Comment;
   level: number;
   isLast: boolean;
   isNewComment: boolean;
@@ -33,102 +56,29 @@ const CommentWithReplies = ({
   mutedColor: string;
   accentColor: string;
 }) => {
-  const indentSize = level * 20; // 20px per level
-  const maxLevel = 3; // Maximum nesting level
-  const currentLevel = Math.min(level, maxLevel);
+  const currentLevel = level || 0;
+  const replies = comment.replies || [];
 
   return (
     <>
-      {/* Main Comment */}
       <Box
-        data-comment-id={comment.id}
-        data-testid={`comment-${comment.id}`}
-        py={4}
-        pl={indentSize}
-        borderBottom={isLast && (!comment.replies || comment.replies.length === 0) ? "none" : "1px solid"}
-        borderColor={isDark ? "#333" : "#e2e8f0"}
-        borderLeft={level > 0 ? "2px solid" : "none"}
-        borderLeftColor={level > 0 ? (isDark ? "#444" : "#e2e8f0") : "transparent"}
-        bg={level > 0 ? (isDark ? '#0a0a0a' : '#fafafa') : 'transparent'}
-        position="relative"
-        style={{
-          transform: isNewComment ? "translateY(-20px) scale(1.02)" : "translateY(0) scale(1)",
-          transition: "all 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
-          opacity: isNewComment ? 0.9 : 1,
-          backgroundColor: isNewComment ? (isDark ? '#1a4d4d' : '#e6fffa') : (level > 0 ? (isDark ? '#0a0a0a' : '#fafafa') : 'transparent'),
-          borderRadius: isNewComment ? '8px' : '0px',
-          marginBottom: isNewComment ? '8px' : '0',
-          boxShadow: isNewComment ? (isDark ? '0 4px 12px rgba(0, 212, 255, 0.2)' : '0 4px 12px rgba(49, 130, 206, 0.2)') : 'none',
-        }}
+        pl={currentLevel * 4}
+        borderLeft={currentLevel > 0 ? `2px solid ${accentColor}` : 'none'}
+        opacity={isNewComment ? 0.8 : 1}
+        transition="opacity 0.3s ease"
       >
-        {/* New comment indicator */}
-        {isNewComment && (
-          <Box
-            position="absolute"
-            top={2}
-            right={2}
-            bg={accentColor}
-            color="white"
-            fontSize="xs"
-            px={2}
-            py={1}
-            borderRadius="full"
-            fontWeight="bold"
-            style={{
-              animation: 'pulse 2s infinite',
-            }}
-          >
-            NEW
-          </Box>
-        )}
-
-        <HStack spacing={3} align="start">
-          <Box
-            w={8}
-            h={8}
-            borderRadius="full"
-            overflow="hidden"
-            flexShrink={0}
-            bg={accentColor}
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-          >
-            <img
-              src={comment.author?.image?.url || 'https://www.blogger.com/img/blogger_logo_round_35.png'}
-              alt={comment.author?.displayName || 'User'}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                borderRadius: '50%'
-              }}
-              onError={(e) => {
-                // Fallback to initials if image fails to load
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                const parent = target.parentElement;
-                if (parent) {
-                  parent.innerHTML = `
-                    <div style="
-                      width: 100%;
-                      height: 100%;
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                      background-color: ${accentColor};
-                      color: white;
-                      font-size: 12px;
-                      font-weight: bold;
-                      border-radius: 50%;
-                    ">
-                      ${comment.author?.displayName?.charAt(0) || 'A'}
-                    </div>
-                  `;
-                }
-              }}
+        <HStack align="start" spacing={4}>
+          {/* Avatar */}
+          <Box>
+            <Avatar
+              size="sm"
+              name={comment.author?.displayName || 'Anonymous'}
+              src={comment.author?.image?.url}
+              bg={isDark ? 'gray.700' : 'gray.200'}
             />
           </Box>
+
+          {/* Comment Content */}
           <VStack align="start" spacing={2} flex={1}>
             <HStack spacing={2}>
               <Text fontSize="sm" fontWeight="medium" color={textColor}>
@@ -154,14 +104,14 @@ const CommentWithReplies = ({
       </Box>
 
       {/* Replies */}
-      {comment.replies && comment.replies.length > 0 && (
+      {replies.length > 0 && (
         <>
-          {comment.replies.map((reply: any, replyIndex: number) => (
+          {replies.map((reply: Comment, replyIndex: number) => (
             <CommentWithReplies
               key={reply.id || `${comment.id}-reply-${replyIndex}`}
               comment={reply}
               level={currentLevel + 1}
-              isLast={replyIndex === comment.replies.length - 1 && isLast}
+              isLast={replyIndex === replies.length - 1 && isLast}
               isNewComment={false}
               isDark={isDark}
               textColor={textColor}
@@ -179,15 +129,23 @@ interface BloggerCommentSectionProps {
   postId: string;
   postUrl?: string;
   title?: string;
+  isDark: boolean;
+  textColor: string;
+  mutedColor: string;
+  accentColor: string;
 }
 
 const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
   postId,
   postUrl,
-  title = 'Comments'
+  title = 'Comments',
+  isDark,
+  textColor,
+  mutedColor,
+  accentColor
 }) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [commentsData, setCommentsData] = useState<any>(null);
+  const [commentsData, setCommentsData] = useState<CommentsData | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [newCommentAdded, setNewCommentAdded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -195,11 +153,7 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
   const { colorMode } = useColorMode();
 
   // Clean theme colors
-  const isDark = colorMode === 'dark';
   const bgColor = isDark ? '#131313' : '#f4f4f4';
-  const textColor = isDark ? '#ffffff' : '#1a202c';
-  const mutedColor = isDark ? '#a0aec0' : '#718096';
-  const accentColor = isDark ? '#00d4ff' : '#3182ce';
 
   const COMMENTS_PER_PAGE = 50; // Increased from 4 to 50
 
@@ -210,9 +164,14 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
     ? postId.split('/').pop() || postId
     : postId;
 
-  // Blogger comment iframe URL with custom styling
-  const blogId = blogConfig.blogId; // Your blog ID
-  const commentIframeUrl = `https://www.blogger.com/comment-iframe.g?blogID=${blogId}&postID=${cleanPostId}`;
+  // Thay đổi cách tạo URL iframe
+  const commentIframeUrl = useMemo(() => {
+    if (!postUrl) return '';
+    const url = new URL(postUrl);
+    url.searchParams.set('showcommentframe', 'true');
+    url.searchParams.set('embedCommentForm', 'true');
+    return url.toString();
+  }, [postUrl]);
 
   // Simple iframe load handler (no styling attempts)
   const applyIframeDarkMode = () => {
@@ -407,22 +366,22 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
   };
 
   // Organize comments into threaded structure
-  const organizeCommentsIntoThreads = (comments: any[]) => {
-    const commentMap = new Map();
-    const rootComments: any[] = [];
+  const organizeCommentsIntoThreads = (comments: Comment[]) => {
+    const commentMap = new Map<string, Comment>();
+    const rootComments: Comment[] = [];
 
     // First pass: Create map of all comments
-    comments.forEach(comment => {
+    comments.forEach((comment: Comment) => {
       comment.replies = [];
       commentMap.set(comment.id, comment);
     });
 
     // Second pass: Organize into parent-child relationships
-    comments.forEach(comment => {
+    comments.forEach((comment: Comment) => {
       if (comment.parentId && commentMap.has(comment.parentId)) {
         // This is a reply - add to parent's replies
-        const parent = commentMap.get(comment.parentId);
-        parent.replies.push(comment);
+        const parent = commentMap.get(comment.parentId)!;
+        parent.replies!.push(comment);
         comment.isReply = true;
         comment.parentComment = parent;
       } else {
@@ -433,10 +392,12 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
     });
 
     // Sort replies by date (oldest first for natural conversation flow)
-    const sortCommentsByDate = (commentList: any[]) => {
-      commentList.sort((a, b) => new Date(a.published).getTime() - new Date(b.published).getTime());
-      commentList.forEach(comment => {
-        if (comment.replies.length > 0) {
+    const sortCommentsByDate = (commentList: Comment[]) => {
+      commentList.sort((a: Comment, b: Comment) => 
+        new Date(a.published).getTime() - new Date(b.published).getTime()
+      );
+      commentList.forEach((comment: Comment) => {
+        if (comment.replies && comment.replies.length > 0) {
           sortCommentsByDate(comment.replies);
         }
       });
@@ -449,8 +410,18 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
   // Check if we're in development mode
   const isDevelopment = import.meta.env.DEV;
 
-  // Optimized comment fetching with environment-based strategy
+  // Thêm ref để theo dõi lần fetch cuối
+  const lastFetchTimeRef = useRef<number>(0);
+  const FETCH_COOLDOWN = 5000; // 5 giây cooldown giữa các lần fetch
+
+  // Sửa lại hàm fetchComments
   const fetchComments = async (silent = false) => {
+    const now = Date.now();
+    if (now - lastFetchTimeRef.current < FETCH_COOLDOWN) {
+      console.log('⏳ Skipping fetch - cooldown period');
+      return;
+    }
+
     try {
       if (!silent) setIsLoading(true);
       console.log('🔄 Fetching comments for post:', cleanPostId);
@@ -484,7 +455,14 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
               // Fallback to direct fetch in dev if proxy fails
               console.log('🔄 Proxy failed, trying direct fetch as fallback...');
               try {
-                response = await fetch(feedUrl);
+                response = await fetch(feedUrl, {
+                  headers: {
+                    'Accept': 'application/atom+xml, application/xml, text/xml, */*',
+                    'User-Agent': 'Mozilla/5.0 (compatible; BlogReader/1.0)',
+                    'Origin': window.location.origin
+                  },
+                  mode: 'cors'
+                });
                 console.log('📊 Direct fetch fallback response:', response.status, response.statusText);
               } catch (directError) {
                 console.log('❌ Direct fetch fallback error:', directError);
@@ -492,14 +470,39 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
               }
             }
           } else {
-            // PRODUCTION: Use direct fetch only
+            // PRODUCTION: Use direct fetch with proper headers
             console.log('🚀 PRODUCTION MODE: Using direct fetch...');
             try {
-              response = await fetch(feedUrl);
+              response = await fetch(feedUrl, {
+                headers: {
+                  'Accept': 'application/atom+xml, application/xml, text/xml, */*',
+                  'User-Agent': 'Mozilla/5.0 (compatible; BlogReader/1.0)',
+                  'Origin': window.location.origin
+                },
+                mode: 'cors',
+                credentials: 'omit' // Don't send cookies for cross-origin requests
+              });
               console.log('📊 Direct fetch response:', response.status, response.statusText);
             } catch (directError) {
               console.log('❌ Direct fetch error:', directError);
-              response = { ok: false, status: 0 } as any;
+              // Try alternative URL format if first attempt fails
+              try {
+                const altFeedUrl = feedUrl.replace('/feeds/', '/feeds/posts/');
+                console.log('🔄 Trying alternative feed URL:', altFeedUrl);
+                response = await fetch(altFeedUrl, {
+                  headers: {
+                    'Accept': 'application/atom+xml, application/xml, text/xml, */*',
+                    'User-Agent': 'Mozilla/5.0 (compatible; BlogReader/1.0)',
+                    'Origin': window.location.origin
+                  },
+                  mode: 'cors',
+                  credentials: 'omit'
+                });
+                console.log('📊 Alternative URL fetch response:', response.status, response.statusText);
+              } catch (altError) {
+                console.log('❌ Alternative URL fetch error:', altError);
+                response = { ok: false, status: 0 } as any;
+              }
             }
           }
 
@@ -526,15 +529,20 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
                 continue; // Try next feed URL
               }
             } else {
-              // Handle XML response (original method)
+              // Handle XML response
               console.log('📄 Parsing XML response...');
               const xmlContent = await response.text();
               console.log('📄 XML content length:', xmlContent.length);
               console.log('📄 XML preview:', xmlContent.substring(0, 200) + '...');
 
               if (xmlContent && xmlContent.trim()) {
-                commentsData = parseCommentsFromAtom(xmlContent);
-                console.log('🔍 XML parsed comments data:', commentsData);
+                try {
+                  commentsData = parseCommentsFromAtom(xmlContent);
+                  console.log('🔍 XML parsed comments data:', commentsData);
+                } catch (parseError) {
+                  console.warn('❌ XML parsing failed:', parseError);
+                  continue; // Try next feed URL
+                }
               } else {
                 console.warn('⚠️ Empty XML content received');
                 continue;
@@ -557,7 +565,7 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
               // Try different filtering strategies
               if (commentsData.items.length > 0 && cleanPostId) {
                 // Strategy 1: Strict filtering
-                const strictFiltered = commentsData.items.filter(comment => {
+                const strictFiltered = commentsData.items.filter((comment: Comment) => {
                   const commentId = comment.id || '';
                   const isForThisPost = commentId.includes(cleanPostId) ||
                                        commentId.includes(`post-${cleanPostId}`) ||
@@ -654,6 +662,8 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
     } finally {
       if (!silent) setIsLoading(false);
     }
+
+    lastFetchTimeRef.current = now;
   };
 
   // Scroll to specific comment by ID
@@ -724,7 +734,25 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
     }
   };
 
-  // Enhanced comment detection system
+  // Thêm state để theo dõi polling
+  const [isPolling, setIsPolling] = useState(false);
+  const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup function
+  const cleanupPolling = () => {
+    if (pollingTimeoutRef.current) {
+      clearTimeout(pollingTimeoutRef.current);
+      pollingTimeoutRef.current = null;
+    }
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    setIsPolling(false);
+  };
+
+  // Sửa lại handleIframeLoad
   const handleIframeLoad = () => {
     console.log('🔄 Iframe loaded, setting up comment detection...');
     applyIframeDarkMode();
@@ -735,111 +763,93 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
       const urlParams = new URLSearchParams(window.location.search);
       const hash = window.location.hash;
 
-      // Check for Blogger comment success indicators
       if (urlParams.has('sc') || hash.startsWith('#c')) {
         console.log('🎉 Comment success detected in URL!');
-        console.log('- URL:', currentUrl);
-        console.log('- SC param:', urlParams.get('sc'));
-        console.log('- Comment hash:', hash);
-
-        // Extract comment ID from hash
+        
         if (hash.startsWith('#c')) {
-          const commentId = hash.substring(2); // Remove '#c'
+          const commentId = hash.substring(2);
           console.log('📝 New comment ID:', commentId);
 
-          // Comment posted - will scroll automatically, no toast needed
-
-          // Wait for comments to be fetched, then scroll to the new comment
           const waitAndScrollToComment = async () => {
-            console.log('🔄 Fetching comments to find new comment...');
-            await fetchComments(true); // Silent refresh
-
-            // Wait a bit for DOM to update
-            setTimeout(() => {
-              scrollToComment(commentId);
-            }, 500);
+            if (!isLoading) {
+              console.log('🔄 Fetching comments to find new comment...');
+              await fetchComments(true);
+              setTimeout(() => {
+                scrollToComment(commentId);
+              }, 500);
+            }
           };
 
           waitAndScrollToComment();
         }
 
-        // Clean URL (optional - remove success parameters)
         const cleanUrl = window.location.pathname;
         window.history.replaceState({}, '', cleanUrl);
       }
     };
 
-    // Start aggressive polling for new comments
+    // Start polling for new comments with timeout
     const startCommentPolling = () => {
+      if (isPolling || isLoading) {
+        console.log('⏹️ Polling or loading in progress, skipping...');
+        return;
+      }
+
       console.log('🎯 Starting comment polling...');
+      setIsPolling(true);
 
-      const pollInterval = setInterval(async () => {
-        console.log('🔄 Polling for new comments...');
-        await fetchComments(true); // Silent refresh
-      }, 2000); // Check every 2 seconds
+      pollingIntervalRef.current = setInterval(async () => {
+        if (!isLoading) {
+          console.log('🔄 Polling for new comments...');
+          await fetchComments(true);
+        }
+      }, FETCH_COOLDOWN);
 
-      // Stop polling after 60 seconds
-      setTimeout(() => {
-        console.log('⏹️ Stopping comment polling');
-        clearInterval(pollInterval);
-      }, 60000);
+      pollingTimeoutRef.current = setTimeout(() => {
+        console.log('⏹️ Stopping comment polling after timeout');
+        cleanupPolling();
+      }, 30000);
 
-      return pollInterval;
+      return pollingIntervalRef.current;
     };
 
     // Check current URL immediately
     checkCurrentUrlForComment();
 
-    // Method 1: Listen for iframe URL changes (indicates redirect after comment)
+    // Method 1: Listen for iframe URL changes
     let lastUrl = '';
     const checkUrlChange = () => {
       try {
         const iframe = iframeRef.current;
-        if (iframe && iframe.contentWindow) {
+        if (iframe?.contentWindow) {
           const currentUrl = iframe.contentWindow.location.href;
-          if (currentUrl !== lastUrl) {
-            console.log('🔄 Iframe URL changed:', currentUrl);
-            if (currentUrl.includes('#c') || currentUrl.includes('comment')) {
-              console.log('🎯 Comment URL detected, starting polling...');
-              startCommentPolling();
-
-              // Comment submitted - polling started, no toast needed
-            }
-            lastUrl = currentUrl;
+          if (currentUrl !== lastUrl && (currentUrl.includes('#c') || currentUrl.includes('comment'))) {
+            console.log('🎯 Comment URL detected, starting polling...');
+            startCommentPolling();
           }
+          lastUrl = currentUrl;
         }
       } catch (error) {
         // CORS will block this, but worth trying
       }
     };
 
-    // Method 2: Listen for window focus (user might return after commenting)
+    // Method 2: Listen for window focus
     const handleWindowFocus = () => {
-      console.log('👁️ Window focused, checking for new comments...');
-      fetchComments(true);
+      if (!isPolling && !isLoading) {
+        console.log('👁️ Window focused, checking for new comments...');
+        fetchComments(true);
+      }
     };
 
-    // Method 3: Periodic URL checking
     const urlCheckInterval = setInterval(checkUrlChange, 1000);
     window.addEventListener('focus', handleWindowFocus);
 
-    // Method 4: Start polling immediately (fallback)
-    setTimeout(() => {
-      console.log('🔄 Starting fallback polling...');
-      startCommentPolling();
-    }, 10000); // Start after 10 seconds
-
-    // Cleanup
     return () => {
       clearInterval(urlCheckInterval);
       window.removeEventListener('focus', handleWindowFocus);
+      cleanupPolling();
     };
-  };
-
-  // Manual refresh function
-  const handleRefresh = async () => {
-    await fetchComments();
-    // Comments refreshed - no toast needed
   };
 
   // Scroll to comment form
@@ -867,17 +877,28 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
     }
   };
 
-
-
-  // Initial load
+  // Sửa lại useEffect cho initial load
   useEffect(() => {
-    if (cleanPostId && cleanPostId !== 'demo-manga') {
-      fetchComments();
-    } else {
-      setIsLoading(false);
-      setCommentsData({ totalItems: 0, items: [] });
-    }
-  }, [postId, cleanPostId]);
+    let mounted = true;
+
+    const initialFetch = async () => {
+      if (!cleanPostId || cleanPostId === 'demo-manga') {
+        setIsLoading(false);
+        setCommentsData({ totalItems: 0, items: [] });
+        return;
+      }
+
+      if (mounted) {
+        await fetchComments();
+      }
+    };
+
+    initialFetch();
+
+    return () => {
+      mounted = false;
+    };
+  }, [cleanPostId]); // Chỉ phụ thuộc vào cleanPostId
 
   // Apply dark mode when color mode changes
   useEffect(() => {
@@ -888,7 +909,7 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
 
   // Get paginated comments
   const paginatedComments = commentsData?.items?.slice(0, currentPage * COMMENTS_PER_PAGE) || [];
-  const hasMoreComments = commentsData?.items?.length > currentPage * COMMENTS_PER_PAGE;
+  const hasMoreComments = (commentsData?.items?.length || 0) > currentPage * COMMENTS_PER_PAGE;
 
   if (!cleanPostId) {
     return (
@@ -920,6 +941,15 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
     };
   }, []);
 
+  // Sửa lại handleRefresh
+  const handleRefresh = async () => {
+    if (isLoading) {
+      console.log('⏳ Skipping refresh - already loading');
+      return;
+    }
+    await fetchComments();
+  };
+
   return (
     <VStack spacing={6} align="stretch" w="100%">
       {/* Clean Header */}
@@ -930,7 +960,7 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
             {title}
           </Text>
           <Text fontSize="sm" color={mutedColor}>
-            ({commentsData?.totalItems || 0})
+            ({commentsData?.totalItems ?? 0})
           </Text>
         </HStack>
 
@@ -964,21 +994,38 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
       </HStack>
 
       {/* Comment Form */}
-      <Box
-        borderRadius="8px"
-        overflow="hidden"
-        data-testid="comment-form"
-      >
-        <iframe
-          ref={iframeRef}
-          src={commentIframeUrl}
-          width="100%"
-          height="200"
-          title="Add Comment"
-          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
-          onLoad={handleIframeLoad}
-        />
-      </Box>
+      {postUrl && (
+        <Box
+          borderRadius="8px"
+          overflow="hidden"
+          data-testid="comment-form"
+          display="none" // Ẩn iframe vì nó gây ra lỗi CSP
+        >
+          <iframe
+            ref={iframeRef}
+            src={commentIframeUrl}
+            width="100%"
+            height="200"
+            title="Add Comment"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
+            onLoad={handleIframeLoad}
+          />
+        </Box>
+      )}
+
+      {/* Thay thế bằng nút mở form bình luận trong tab mới */}
+      {postUrl && (
+        <Button
+          leftIcon={<FaComment />}
+          colorScheme="blue"
+          variant="outline"
+          onClick={() => window.open(postUrl, '_blank')}
+          size="md"
+          width="full"
+        >
+          Thêm bình luận
+        </Button>
+      )}
 
       {/* Comments List */}
       <VStack spacing={4} align="stretch">
@@ -987,7 +1034,7 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
             <Spinner size="md" color={accentColor} />
             <Text fontSize="sm" color={mutedColor}>Loading comments...</Text>
           </HStack>
-        ) : commentsData?.totalItems === 0 ? (
+        ) : !commentsData || commentsData.totalItems === 0 ? (
           <VStack spacing={3} py={8}>
             <FaComments size={24} color={mutedColor} />
             <Text fontSize="sm" color={mutedColor} textAlign="center">
@@ -996,7 +1043,7 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
           </VStack>
         ) : (
           <>
-            {paginatedComments.map((comment: any, index: number) => (
+            {paginatedComments.map((comment: Comment, index: number) => (
               <CommentWithReplies
                 key={comment.id || index}
                 comment={comment}
@@ -1010,7 +1057,7 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
               />
             ))}
 
-            {hasMoreComments && (
+            {hasMoreComments && commentsData && (
               <HStack spacing={2} justify="center">
                 <Button
                   variant="ghost"
@@ -1019,13 +1066,13 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
                   color={mutedColor}
                   _hover={{ color: textColor }}
                 >
-                  Load more ({commentsData.totalItems - paginatedComments.length} remaining)
+                  Load more ({(commentsData?.totalItems ?? 0) - paginatedComments.length} remaining)
                 </Button>
 
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setCurrentPage(Math.ceil(commentsData.totalItems / COMMENTS_PER_PAGE))}
+                  onClick={() => setCurrentPage(Math.ceil((commentsData?.totalItems ?? 0) / COMMENTS_PER_PAGE))}
                   color={accentColor}
                   _hover={{ color: textColor }}
                 >

@@ -37,7 +37,6 @@ import { loadPost } from '../utils/postLoader';
 import { clearCachedData, CACHE_KEYS } from '../utils/cache';
 import useUserStore from '../store/useUserStore';
 import useFavoriteBookmarkStore from '../store/useFollowBookmarkStore';
-import FollowButton from '../components/FollowButton';
 import { PostCover, TagList, PostInfo } from '../components/PostCard';
 import BackgroundPattern from '../components/BackgroundPattern';
 
@@ -249,10 +248,11 @@ const PostContent: React.FC<PostContentProps> = ({ post }) => {
       const mangaData = {
         id: realPost.id,
         title: realPost.title,
-        url: realPost.url || window.location.href,
+        url: realPost.url,
         currentPage: 1,
-        totalPages: mangaImages.length || 1,
-        verticalMode: false
+        totalPages: 1, // Will be updated when manga loads
+        verticalMode: false, // Default value
+        timestamp: Date.now(),
       };
 
       await storeToggleBookmark(mangaData, userId || '', '', toast);

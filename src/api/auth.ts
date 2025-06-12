@@ -15,6 +15,7 @@ import { getAndDecryptToken, encryptAndStoreToken, clearEncryptedData } from '..
 import { getRefreshToken, setRefreshToken, clearTokens } from '../utils/userUtils';
 import { fetchWithAuth } from '../utils/apiUtils';
 import useUserStore from '../store/useUserStore';
+import useFavoriteBookmarkStore from '../store/useFavoriteBookmarkStore';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -61,8 +62,8 @@ export const handleLogin = async (params: LoginParams): Promise<void> => {
     }
 
     // Clear any existing guest data
-    await clearTokens();
-    await deleteUserDataFromDB('guest');
+    void await clearTokens();
+    void await deleteUserDataFromDB('guest');
 
     // Create initial user data structure
     const initialUserData = {
@@ -171,34 +172,95 @@ export const handleLogout = async (params: LogoutParams): Promise<void> => {
   try {
     if (onClose) onClose();
 
-    // Backup data before logout using fetchWithAuth
-    if (userId) { // Access token will be retrieved internally by fetchWithAuth
+    console.log('[auth.ts] Starting logout process for user:', userId);
+
+    // Backup data before logout
+    if (userId) {
       try {
+        console.log('[auth.ts] Backing up data before logout...');
         const favoritePosts = await getHistoryData('favorites', userId) || [];
         const readPosts = await getHistoryData('reads', userId) || [];
         const mangaBookmarks = await getHistoryData('bookmarks', userId) || [];
         
-        // The accessToken parameter for backupUserData is now optional as fetchWithAuth handles it.
-        // We pass the userId here for context, though backupUserData itself might not need it if only using accessToken
         await backupUserData(userId, { readPosts, favoritePosts, mangaBookmarks });
-        toast({ title: "Đã sao lưu dữ liệu", description: "Dữ liệu của bạn đã được sao lưu lên Google Drive", status: "success", duration: 2000 });
+        console.log('[auth.ts] Data backup completed');
+        toast({ 
+          title: "Đã sao lưu dữ liệu", 
+          description: "Dữ liệu của bạn đã được sao lưu lên Google Drive", 
+          status: "success", 
+          duration: 2000 
+        });
       } catch (error: any) {
-        console.error('Error backing up data:', error);
-        toast({ title: "Cảnh báo", description: "Không thể sao lưu dữ liệu trước khi đăng xuất", status: "warning", duration: 3000, isClosable: true });
+        console.error('[auth.ts] Error backing up data:', error);
+        toast({ 
+          title: "Cảnh báo", 
+          description: "Không thể sao lưu dữ liệu trước khi đăng xuất", 
+          status: "warning", 
+          duration: 3000, 
+          isClosable: true 
+        });
       }
     }
-    userId ? await saveHistoryData('bookmarks', userId, []) : Promise.resolve();
-    userId ? await saveHistoryData('favorites', userId, []) : Promise.resolve();
-    userId ? await saveHistoryData('reads', userId, []) : Promise.resolve();
-    await deleteUserDataFromDB(userId);
-    await clearTokens(); // Clear refresh token as well
-    // Toast is handled by useAuthNew to avoid duplicates
-    // toast({ title: "Đăng xuất thành công", description: "Đang chuyển về trang chủ...", status: "success", duration: 2000, isClosable: true });
+
+    // Clear all user data from IndexedDB
+    console.log('[auth.ts] Clearing user data from IndexedDB...');
+    try {
+      if (userId) {
+        // Clear all history data
+        await Promise.all([
+          saveHistoryData('bookmarks', userId, []),
+          saveHistoryData('favorites', userId, []),
+          saveHistoryData('reads', userId, []),
+          deleteUserDataFromDB(userId)
+        ]);
+        console.log('[auth.ts] IndexedDB data cleared successfully');
+      }
+    } catch (dbError: any) {
+      console.error('[auth.ts] Error clearing IndexedDB data:', dbError);
+      toast({
+        title: "Cảnh báo",
+        description: "Không thể xóa hoàn toàn dữ liệu cục bộ",
+        status: "warning",
+        duration: 3000,
+        isClosable: true
+      });
+    }
+
+    // Clear file ID cache
+    console.log('[auth.ts] Clearing file ID cache...');
+    fileIdCache.clear();
+
+    // Clear all tokens and encrypted data
+    console.log('[auth.ts] Clearing tokens and encrypted data...');
+    await Promise.all([
+      clearTokens(),
+      clearEncryptedData()
+    ]);
+
+    // Clear any remaining localStorage items
+    console.log('[auth.ts] Clearing localStorage...');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('userData');
+    localStorage.removeItem('lastSyncTime');
+    localStorage.removeItem('syncStatus');
+
+    // Reset favorite/bookmark store state
+    useFavoriteBookmarkStore.getState().resetStore();
+
+    console.log('[auth.ts] Logout process completed');
     navigate('/', { replace: true });
   } catch (error: any) {
-    console.error('Logout error:', error);
+    console.error('[auth.ts] Logout error:', error);
     const handledError = handleError(error);
-    toast({ title: "Lỗi đăng xuất", description: handledError.message || "Có lỗi xảy ra khi đăng xuất", status: "error", duration: 5000, isClosable: true });
+    toast({ 
+      title: "Lỗi đăng xuất", 
+      description: handledError.message || "Có lỗi xảy ra khi đăng xuất", 
+      status: "error", 
+      duration: 5000, 
+      isClosable: true 
+    });
+    // Force navigation even if there's an error
     navigate('/', { replace: true });
   }
 };
@@ -333,6 +395,7 @@ export const findFile = async (fileName: string): Promise<any> => {
 
 export const createFile = async (fileName: string, jsonData: any): Promise<any> => {
   try {
+    console.log('[auth.ts] Creating file:', fileName);
     const metadata = {
       name: fileName,
       parents: ['appDataFolder'],
@@ -343,19 +406,36 @@ export const createFile = async (fileName: string, jsonData: any): Promise<any> 
     form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
     form.append('file', new Blob([JSON.stringify(jsonData)], { type: 'application/json' }));
 
+    console.log('[auth.ts] Sending create file request to Drive API...');
     const response = await fetchWithAuth('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
       method: 'POST',
       body: form
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to create file: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('[auth.ts] Drive API error response:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText
+      });
+      throw new Error(`Failed to create file: ${response.status} ${response.statusText} - ${errorText}`);
     }
+
     const data = await response.json();
+    console.log('[auth.ts] File created successfully:', {
+      fileId: data.id,
+      name: data.name,
+      mimeType: data.mimeType
+    });
     fileIdCache.set(fileName, data.id);
     return data;
   } catch (error: any) {
-    console.error('Error creating file:', error);
+    console.error('[auth.ts] Error creating file:', {
+      fileName,
+      error: error.message,
+      stack: error.stack
+    });
     throw error;
   }
 };
@@ -386,22 +466,40 @@ export const saveOrUpdateJson = async (fileName: string, jsonData: any): Promise
     const file = await findFile(fileName);
     
     if (file && file.id) {
-      console.log('[auth.ts] Found existing file, updating:', file.id);
+      console.log('[auth.ts] Found existing file, updating:', {
+        fileId: file.id,
+        name: file.name
+      });
       return await updateFile(file.id, jsonData);
     } else {
       console.log('[auth.ts] File not found, creating new file');
-      return await createFile(fileName, jsonData);
+      try {
+        const result = await createFile(fileName, jsonData);
+        console.log('[auth.ts] New file created successfully:', {
+          fileId: result.id,
+          name: result.name
+        });
+        return result;
+      } catch (createError: any) {
+        console.error('[auth.ts] Failed to create new file:', {
+          error: createError.message,
+          stack: createError.stack,
+          fileName
+        });
+        // Check if error is due to permissions
+        if (createError.message?.includes('403') || createError.message?.toLowerCase().includes('permission')) {
+          throw new Error('Không có quyền tạo file trên Google Drive. Vui lòng đăng nhập lại để cấp quyền.');
+        }
+        throw createError;
+      }
     }
   } catch (error: any) {
-    console.error('[auth.ts] Error in saveOrUpdateJson:', error);
-    // Thử tạo file mới nếu có lỗi
-    try {
-      console.log('[auth.ts] Attempting to create new file after error');
-      return await createFile(fileName, jsonData);
-    } catch (createError: any) {
-      console.error('[auth.ts] Failed to create new file:', createError);
-      throw new Error(`Failed to save or update file: ${createError.message || 'Unknown error'}`);
-    }
+    console.error('[auth.ts] Error in saveOrUpdateJson:', {
+      error: error.message,
+      stack: error.stack,
+      fileName
+    });
+    throw error;
   }
 };
 

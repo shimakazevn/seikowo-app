@@ -1,42 +1,36 @@
 import { getSlugFromUrl, extractImage, Post } from './blogUtils';
-import { getHistoryData, saveHistoryData, getHistoryKey, openDatabase, getDataFromDB, saveDataToDB, withTransaction } from './indexedDBUtils';
+import { getHistoryData, saveHistoryData, openDatabase, getDataFromDB, saveDataToDB, withTransaction } from './indexedDBUtils';
 import { getUserInfo } from './userUtils';
+import type { FavoritePost, MangaBookmark } from '../types/global';
 
 // Interfaces
 export interface PostData {
   id: string;
-  title?: string;
-  url?: string;
+  title: string;
+  url: string;
   content?: string;
-  published?: string;
-  updated?: string;
-  labels?: string[];
+  published: string;
+  updated: string;
+  labels: string[];
   thumbnail?: string | null;
   slug?: string;
   timestamp?: number;
   data?: PostData;
 }
 
-export interface MangaBookmark extends PostData {
-  currentPage: number;
-  bookmarkId?: string;
-}
+// export interface MangaBookmark extends PostData {
+//   currentPage: number;
+//   bookmarkId?: string;
+// }
 
-export interface FavoritePost extends PostData {
-  favoriteAt: number;
-}
-
-// Keep old interface for backward compatibility
-export interface FollowedPost extends PostData {
-  followAt: number;
-}
+// export interface FavoritePost extends PostData {
+//   favoriteAt: number;
+// }
 
 export interface SyncResult {
-  followCount: number;
   bookmarkCount: number;
   synced: boolean;
   changes: {
-    follows: number;
     bookmarks: number;
   };
 }
@@ -147,351 +141,97 @@ export const saveMangaBookmark = async (bookmark: MangaBookmark): Promise<boolea
   }
 };
 
-// Sync guest data to user account with improved error handling
-export const syncGuestData = async (userId: string): Promise<SyncResult> => {
-  if (!userId) {
-    throw new Error('User ID is required for sync');
-  }
-
-  try {
-    // Get local data
-    const [follows, bookmarks] = await Promise.all([
-      getHistoryData('favorites', 'guest'),
-      getHistoryData('bookmarks', 'guest')
-    ]);
-
-    // Get user data
-    const [userFollows, userBookmarks] = await Promise.all([
-      getHistoryData('favorites', userId),
-      getHistoryData('bookmarks', userId)
-    ]);
-
-    // Merge data
-    const mergedFollowPosts = mergeArrays<FollowedPost>(
-      Array.isArray(userFollows) ? userFollows : [],
-      Array.isArray(follows) ? follows : [],
-      'followAt'
-    );
-    const mergedBookmarks = mergeArrays<MangaBookmark>(
-      Array.isArray(userBookmarks) ? userBookmarks : [],
-      Array.isArray(bookmarks) ? bookmarks : [],
-      'timestamp'
-    );
-
-    // Save merged data in parallel
-    await Promise.all([
-      saveHistoryData('follows', userId, mergedFollowPosts),
-      saveHistoryData('bookmarks', userId, mergedBookmarks)
-    ]);
-
-    // Clear guest data after successful sync
-    await Promise.all([
-      saveHistoryData('follows', 'guest', []),
-      saveHistoryData('bookmarks', 'guest', [])
-    ]);
-
-    return {
-      followCount: mergedFollowPosts.length,
-      bookmarkCount: mergedBookmarks.length,
-      synced: true,
-      changes: {
-        follows: mergedFollowPosts.length - (Array.isArray(userFollows) ? userFollows.length : 0),
-        bookmarks: mergedBookmarks.length - (Array.isArray(userBookmarks) ? userBookmarks.length : 0)
-      }
-    };
-  } catch (error: any) {
-    console.error('Error syncing guest data:', error);
-    throw error;
-  }
-};
-
-// Helper function to check if a post is followed with improved error handling
-export const isFollowed = async (post: PostData | { data: PostData }, userId: string = 'guest'): Promise<boolean> => {
-  if (!post) {
-    throw new Error('Post data is required');
-  }
-
-  const realPost = (post as { data: PostData })?.data ? (post as { data: PostData }).data : (post as PostData);
-  if (!realPost || !realPost.id) {
-    throw new Error('Invalid post data structure');
-  }
-
-  try {
-    const followedPosts = userId ? await getHistoryData('follows', userId) : [];
-    return Array.isArray(followedPosts) && followedPosts.some((item: FollowedPost) => item.id === realPost.id);
-  } catch (error: any) {
-    console.error('Error checking if post is followed:', error);
-    throw error;
-  }
-};
-
-// Helper function to save a post as followed with improved error handling
-export const saveFollow = async (post: PostData | { data: PostData }, userId: string = 'guest'): Promise<boolean> => {
-  if (!post) {
-    throw new Error('Post data is required');
-  }
-
-  const realPost = (post as { data: PostData })?.data ? (post as { data: PostData }).data : (post as PostData);
-  if (!realPost || !realPost.id) {
-    throw new Error('Invalid post data structure');
-  }
-
-  try {
-    const followedPosts = userId ? await getHistoryData('follows', userId) : [];
-    const filteredPosts: any[] = Array.isArray(followedPosts) ? followedPosts.filter((item: FollowedPost) => item.id !== realPost.id) : [];
-
-    const thumbnail = realPost.thumbnail || (realPost.content ? extractImage(realPost.content) : null);
-    const newFollow: FollowedPost = {
-      id: realPost.id,
-      title: realPost.title,
-      url: realPost.url,
-      published: realPost.published,
-      updated: realPost.updated,
-      labels: realPost.labels,
-      thumbnail,
-      followAt: Date.now(),
-    };
-
-    const updatedPosts = [newFollow, ...filteredPosts].slice(0, MAX_FAVORITES);
-    userId ? await saveHistoryData('favorites', userId, updatedPosts) : Promise.resolve();
-    return true;
-  } catch (error: any) {
-    console.error('Error saving follow:', error);
-    throw error;
-  }
-};
-
-// Helper function to remove a post from followed with improved error handling
-export const removeFollow = async (post: PostData | { data: PostData }, userId: string = 'guest'): Promise<boolean> => {
-  if (!post) {
-    throw new Error('Post data is required');
-  }
-
-  const realPost = (post as { data: PostData })?.data ? (post as { data: PostData }).data : (post as PostData);
-  if (!realPost || !realPost.id) {
-    throw new Error('Invalid post data structure');
-  }
-
-  try {
-    const followedPosts = userId ? await getHistoryData('favorites', userId) : [];
-    if (!Array.isArray(followedPosts)) {
-      return true;
-    }
-
-    const updatedPosts = followedPosts.filter((item: FollowedPost) => item.id !== realPost.id);
-    userId ? await saveHistoryData('favorites', userId, updatedPosts) : Promise.resolve();
-    return true;
-  } catch (error: any) {
-    console.error('Error removing follow:', error);
-    throw error;
-  }
-};
-
-// Post cache functions removed - using cache service instead
-
+// Clear post cache
 export const clearPostCache = async (): Promise<void> => {
   try {
-    await withTransaction(['posts'], 'readwrite', async (tx) => {
-      const store = tx.objectStore('posts');
-      await store.clear();
+    const db = await openDatabase();
+    const transaction = db.transaction(['cache'], 'readwrite');
+    const objectStore = transaction.objectStore('cache');
+    objectStore.clear();
+    return new Promise((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = (event) => reject((event.target as IDBRequest).error);
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error clearing post cache:', error);
     throw error;
   }
 };
 
-// Admin-specific utility functions
-
-/**
- * Extract the first image URL from HTML content for admin
- */
 export const extractFirstImageFromContent = (htmlContent: string): string | null => {
   if (!htmlContent) return null;
-
-  try {
-    // Create a temporary DOM element to parse HTML
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlContent;
-
-    // Look for img tags
-    const imgElements = tempDiv.querySelectorAll('img');
-
-    for (const img of imgElements) {
-      const src = img.getAttribute('src');
-      if (src && src.trim()) {
-        // Skip small images (likely icons or decorative elements)
-        const width = img.getAttribute('width');
-        const height = img.getAttribute('height');
-
-        if (width && height) {
-          const w = parseInt(width);
-          const h = parseInt(height);
-          if (w < 100 || h < 100) continue;
-        }
-
-        // Skip data URLs and very small images
-        if (src.startsWith('data:') && src.length < 1000) continue;
-
-        return src;
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.error('Error extracting image from content:', error);
-    return null;
-  }
+  const imgMatch = htmlContent.match(/<img[^>]+src\s*=\s*"([^"]+)"/);
+  return imgMatch ? imgMatch[1] : null;
 };
 
-/**
- * Get cover image for a post - prioritize featured image, fallback to first content image
- */
 export const getPostCoverImage = (post: any): string | null => {
-  // Try to get featured image from post.images
-  if (post.images && post.images.length > 0) {
-    return post.images[0].url;
-  }
-
-  // Fallback to first image in content
-  if (post.content) {
-    return extractFirstImageFromContent(post.content);
-  }
-
+  if (post.thumbnail) return post.thumbnail;
+  if (post.content) return extractFirstImageFromContent(post.content);
   return null;
 };
 
-/**
- * Optimize image URL for thumbnail display
- */
 export const optimizeImageForThumbnail = (imageUrl: string, size: number = 200): string => {
   if (!imageUrl) return '';
 
-  try {
-    // Handle Blogger/Blogspot images
-    if (imageUrl.includes('blogspot.com') || imageUrl.includes('blogger.com')) {
-      // Remove existing size parameters
-      let optimizedUrl = imageUrl.replace(/\/s\d+-c\//, '/').replace(/=s\d+/, '');
+  // Check if it's a Blogger image URL
+  const bloggerImageRegex = /^(https?:\/\/\d\.bp\.blogspot\.com\/.+?)(?:\/[swck]?\d+)?(\/[^\/]+)$/;
+  const match = imageUrl.match(bloggerImageRegex);
 
-      // Add thumbnail size parameter
-      if (optimizedUrl.includes('=')) {
-        optimizedUrl += `&s=${size}`;
-      } else {
-        optimizedUrl += `=s${size}`;
-      }
-
-      return optimizedUrl;
-    }
-
-    // Handle Google Drive images
-    if (imageUrl.includes('drive.google.com')) {
-      const fileIdMatch = imageUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-      if (fileIdMatch) {
-        return `https://drive.google.com/thumbnail?id=${fileIdMatch[1]}&sz=s${size}`;
-      }
-    }
-
-    // For other URLs, return as-is
-    return imageUrl;
-  } catch (error) {
-    console.error('Error optimizing image URL:', error);
-    return imageUrl;
+  if (match && match[1] && match[2]) {
+    // Reconstruct the URL with the desired size
+    return `${match[1]}/s${size}${match[2]}`;
   }
+
+  // For other image URLs, return as is (or handle other services)
+  return imageUrl;
 };
 
-/**
- * Extract text content from HTML (for preview)
- */
 export const extractTextFromHtml = (htmlContent: string, maxLength: number = 150): string => {
   if (!htmlContent) return '';
-
-  try {
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlContent;
-
-    // Remove script and style elements
-    const scripts = tempDiv.querySelectorAll('script, style');
-    scripts.forEach(el => el.remove());
-
-    const textContent = tempDiv.textContent || tempDiv.innerText || '';
-
-    if (textContent.length <= maxLength) {
-      return textContent.trim();
-    }
-
-    return textContent.substring(0, maxLength).trim() + '...';
-  } catch (error) {
-    console.error('Error extracting text from HTML:', error);
-    return '';
-  }
+  const div = document.createElement('div');
+  div.innerHTML = htmlContent;
+  const text = div.textContent || div.innerText || '';
+  return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
 };
 
-/**
- * Get post by slug from cache
- */
 export const getPostBySlug = async (slug: string): Promise<any | null> => {
-  try {
-    console.log('[postUtils] Getting post by slug:', slug);
+  if (!slug) return null;
 
-    // Get all cached posts
-    const posts = await getDataFromDB('posts', 'all');
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['cache'], 'readonly');
+    const objectStore = transaction.objectStore('cache');
+    const request = objectStore.get(`post-${slug}`);
 
-    if (!Array.isArray(posts) || posts.length === 0) {
-      console.log('[postUtils] No cached posts found');
-      return null;
-    }
-
-    // Find post by slug
-    const post = posts.find(p => {
-      if (!p || !p.url) return false;
-
-      // Extract slug from URL
-      const urlParts = p.url.split('/');
-      const postSlug = urlParts[urlParts.length - 1].replace('.html', '');
-
-      return postSlug === slug;
-    });
-
-    if (post) {
-      console.log('[postUtils] Found post:', post.title);
-      return post;
-    }
-
-    console.log('[postUtils] Post not found for slug:', slug);
-    return null;
-  } catch (error) {
-    console.error('[postUtils] Error getting post by slug:', error);
-    return null;
-  }
-};
-
-/**
- * Generate manga reader URL
- */
-export const generateMangaReaderUrl = (slug: string, page: number = 1): string => {
-  return `/read/${slug}/${page}`;
-};
-
-/**
- * Check if current URL is manga reader
- */
-export const isMangaReaderUrl = (pathname: string): boolean => {
-  return pathname.startsWith('/read/');
-};
-
-/**
- * Parse manga reader URL
- */
-export const parseMangaReaderUrl = (pathname: string): { slug: string; page: number } | null => {
-  const match = pathname.match(/^\/read\/([^\/]+)\/(\d+)$/);
-
-  if (match) {
-    return {
-      slug: match[1],
-      page: parseInt(match[2])
+    request.onsuccess = () => {
+      if (request.result && request.result.data) {
+        resolve(request.result.data);
+      } else {
+        resolve(null);
+      }
     };
-  }
+    request.onerror = (event) => {
+      console.error('Error getting cached post:', (event.target as IDBRequest).error);
+      reject((event.target as IDBRequest).error);
+    };
+  });
+};
 
+export const generateMangaReaderUrl = (slug: string, page: number = 1): string => {
+  return `/manga/${slug}/${page}`;
+};
+
+export const isMangaReaderUrl = (pathname: string): boolean => {
+  return /^\/manga\/[^\/]+\/?\d*\/?$/.test(pathname);
+};
+
+export const parseMangaReaderUrl = (pathname: string): { slug: string; page: number } | null => {
+  const match = pathname.match(/^\/manga\/([^\/]+)(?:\/(\d+))?\/?$/);
+  if (match) {
+    const slug = match[1];
+    const page = match[2] ? parseInt(match[2], 10) : 1;
+    return { slug, page };
+  }
   return null;
 };
 

@@ -502,15 +502,6 @@ const NativeBloggerComments: React.FC<NativeBloggerCommentsProps> = ({
             }
           }
         }
-
-        console.log(`📝 XML Comment:`, {
-          id: id.split('.post-')[1] || id,
-          author: authorName,
-          content: content.substring(0, 100) + '...',
-          parentId,
-          avatarUrl: avatarUrl.includes('blogger_logo') ? 'default' : 'custom'
-        });
-
         return {
           id: id.split('.post-')[1] || id,
           content: content || 'No content available',

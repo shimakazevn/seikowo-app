@@ -58,3 +58,47 @@ export interface UseNavActionsReturn {
   logout: () => void;
   checkUpdatedFollows: () => Promise<void>;
 }
+
+// Auth-related types and interfaces
+export interface EncryptedData {
+  value: string;
+  timestamp: number;
+}
+
+export interface SessionData {
+  userData: any;
+  token: string;
+  refreshToken: string;
+  timestamp: number;
+  sessionId: string;
+  expiresAt: number;
+}
+
+export interface TokenResponse {
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface TokenData {
+  id: string;
+  value: string;
+  timestamp: number;
+}
+
+export interface UserInfoData {
+  id: string;
+  sub: string;
+  email: string;
+  name: string;
+  given_name: string;
+  family_name: string;
+  picture: string;
+  email_verified: boolean;
+  timestamp: number;
+  lastSyncTime: number;
+  syncStatus: {
+    totalFollows: number;
+    totalBookmarks: number;
+  };
+  accessToken?: string;
+}

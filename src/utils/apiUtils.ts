@@ -78,6 +78,7 @@ export async function fetchBloggerApi<T = any>(
   const timeoutId = setTimeout(() => controller.abort(), config.timeout || 10000);
   
   try {
+    console.log(`[fetchBloggerApi] Fetching: ${url}`);
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
@@ -89,6 +90,21 @@ export async function fetchBloggerApi<T = any>(
     clearTimeout(timeoutId);
     
     if (!response.ok) {
+      // Log chi tiết hơn cho lỗi 404
+      if (response.status === 404) {
+        console.error(`[fetchBloggerApi] Resource not found: ${url}`);
+        console.error(`[fetchBloggerApi] Endpoint: ${endpoint}`);
+        console.error(`[fetchBloggerApi] Params:`, params);
+        console.error(`[fetchBloggerApi] Config:`, config);
+        
+        // Kiểm tra nếu là lỗi fetch bài viết
+        if (endpoint.includes('/posts/')) {
+          const postId = endpoint.split('/posts/')[1];
+          console.error(`[fetchBloggerApi] Post ID: ${postId} not found or inaccessible`);
+          throw new Error(`Bài viết không tồn tại hoặc không có quyền truy cập (ID: ${postId})`);
+        }
+      }
+      
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     
@@ -97,8 +113,18 @@ export async function fetchBloggerApi<T = any>(
   } catch (error) {
     clearTimeout(timeoutId);
     
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Request timeout');
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        console.error(`[fetchBloggerApi] Request timeout for: ${url}`);
+        throw new Error('Yêu cầu quá thời gian chờ');
+      }
+      
+      // Nếu là lỗi 404 đã được xử lý ở trên
+      if (error.message.includes('Bài viết không tồn tại')) {
+        throw error;
+      }
+      
+      console.error(`[fetchBloggerApi] Error fetching ${url}:`, error);
     }
     
     throw error;
@@ -177,37 +203,142 @@ interface FetchWithAuthOptions extends RequestInit {
 
 const MAX_RETRIES = 1; // Only one retry after token refresh
 
+// Thêm cache cho token validation
+const tokenCache = {
+  token: null as string | null,
+  expiresAt: 0,
+  isValidating: false,
+  lastFetch: 0
+};
+
+const TOKEN_CACHE_DURATION = 5000; // 5 giây cooldown
+const TOKEN_VALIDATION_DURATION = 3600000; // 1 giờ
+
+/**
+ * Get the appropriate API URL based on environment
+ * @param endpoint - The API endpoint
+ * @param params - URL parameters
+ * @returns The URL to fetch from
+ */
+function getBloggerApiUrl(endpoint: string, params: Record<string, string | number> = {}): string {
+  const isDev = import.meta.env.DEV;
+  const baseUrl = 'https://www.googleapis.com/blogger/v3';
+  
+  // Build target URL
+  const url = new URL(endpoint, baseUrl);
+  
+  // Add parameters
+  Object.entries(params).forEach(([key, value]) => {
+    url.searchParams.set(key, value.toString());
+  });
+  
+  const targetUrl = url.toString();
+  if (isDev) {
+    // Development: Use Vite proxy
+    // Chỉ encode URL một lần để tránh double encoding
+    const proxyUrl = `/api/blogger?url=${encodeURIComponent(targetUrl)}`;
+    console.log('[getBloggerApiUrl] Original URL:', targetUrl);
+    console.log('[getBloggerApiUrl] Proxy URL:', proxyUrl);
+    return proxyUrl;
+  }
+  
+  // Production: Direct API call
+  return targetUrl;
+}
+
 export async function fetchWithAuth(url: string, options?: FetchWithAuthOptions): Promise<Response> {
   const { retryCount = 0, ...fetchOptions } = options || {};
   const userStore = useUserStore.getState();
+  const now = Date.now();
+
+  // Kiểm tra cache và cooldown
+  if (tokenCache.isValidating) {
+    // Đợi tối đa 5 giây nếu đang validate
+    for (let i = 0; i < 50; i++) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      if (!tokenCache.isValidating) {
+        break;
+      }
+    }
+  }
+
+  // Nếu cache còn hạn và chưa hết cooldown
+  if (tokenCache.token && 
+      tokenCache.expiresAt > now && 
+      now - tokenCache.lastFetch < TOKEN_CACHE_DURATION) {
+    console.log('[fetchWithAuth] Using cached token');
+    const headers = {
+      ...fetchOptions.headers,
+      'Authorization': `Bearer ${tokenCache.token}`,
+    };
+    return fetch(url, { ...fetchOptions, headers });
+  }
 
   try {
+    // Bắt đầu validate token mới
+    tokenCache.isValidating = true;
+    tokenCache.lastFetch = now;
+
     const accessToken = await userStore.getValidAccessToken();
 
     if (!accessToken) {
       console.warn('[fetchWithAuth] No valid access token available. Request will proceed without auth.');
-      // Proceed without token if not available, some endpoints might be public
+      tokenCache.isValidating = false;
+      tokenCache.token = null;
+      tokenCache.expiresAt = 0;
       return fetch(url, fetchOptions);
     }
+
+    // Cache token mới
+    tokenCache.token = accessToken;
+    tokenCache.expiresAt = now + TOKEN_VALIDATION_DURATION;
+    tokenCache.isValidating = false;
 
     const headers = {
       ...fetchOptions.headers,
       'Authorization': `Bearer ${accessToken}`,
     };
 
-    const response = await fetch(url, { ...fetchOptions, headers });
+    // Kiểm tra nếu là API Blogger
+    let targetUrl = url;
+    if (url.includes('googleapis.com/blogger/v3')) {
+      try {
+        // Parse URL để lấy endpoint và params
+        const urlObj = new URL(url);
+        const endpoint = urlObj.pathname.replace('/blogger/v3', '');
+        const params = Object.fromEntries(urlObj.searchParams.entries());
+        targetUrl = getBloggerApiUrl(endpoint, params);
+        console.log('[fetchWithAuth] Using proxy for Blogger API:', {
+          originalUrl: url,
+          proxyUrl: targetUrl
+        });
+      } catch (error) {
+        console.error('[fetchWithAuth] Error parsing Blogger API URL:', error);
+        throw new Error('Invalid Blogger API URL');
+      }
+    }
+
+    const response = await fetch(targetUrl, { ...fetchOptions, headers });
 
     // If response is 401 Unauthorized and it's the first attempt, try to refresh token and retry
     if (response.status === 401 && retryCount < MAX_RETRIES) {
       console.warn('[fetchWithAuth] Access token expired or invalid. Attempting to refresh and retry...');
-      const newAccessToken = await userStore.getValidAccessToken(); // This will trigger refresh if needed
+      // Clear cache khi token hết hạn
+      tokenCache.token = null;
+      tokenCache.expiresAt = 0;
+      tokenCache.isValidating = false;
+
+      const newAccessToken = await userStore.getValidAccessToken();
 
       if (newAccessToken) {
         console.log('[fetchWithAuth] Token refreshed successfully. Retrying request...');
+        // Cache token mới
+        tokenCache.token = newAccessToken;
+        tokenCache.expiresAt = now + TOKEN_VALIDATION_DURATION;
         return fetchWithAuth(url, { ...options, retryCount: retryCount + 1 });
       } else {
         console.error('[fetchWithAuth] Failed to refresh token. User will be logged out.');
-        await userStore.logout(); // Force logout if refresh fails
+        await userStore.logout();
         throw new Error('Unauthorized: Failed to refresh token.');
       }
     }
@@ -215,8 +346,13 @@ export async function fetchWithAuth(url: string, options?: FetchWithAuthOptions)
     return response;
   } catch (error: any) {
     console.error('[fetchWithAuth] Error during authenticated fetch:', error);
+    // Clear cache khi có lỗi
+    tokenCache.token = null;
+    tokenCache.expiresAt = 0;
+    tokenCache.isValidating = false;
+
     if (error.message.includes('Unauthorized')) {
-      await userStore.logout(); // Force logout if persistent unauthorized error
+      await userStore.logout();
     }
     throw error;
   }

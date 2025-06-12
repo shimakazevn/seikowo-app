@@ -1,19 +1,12 @@
-import { openDatabase, withTransaction, saveDataToDB, getDataFromDB } from './indexedDBUtils';
-
-// Import User interface from the store
+import { withTransaction, saveDataToDB, getDataFromDB } from './indexedDBUtils';
 import type { User } from '../types/global';
+import type { TokenData, UserInfoData } from '../types/auth';
 
 // Constants
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const USER_INFO_KEY = 'user_info';
 export const USER_INFO_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 export const TOKEN_CACHE_DURATION = 1 * 60 * 60 * 1000; // 1 hour (This is for Access Token, now handled by securityUtils)
-
-interface TokenData {
-  id: string;
-  value: string;
-  timestamp: number;
-}
 
 export const getRefreshToken = async (): Promise<string | null> => {
   try {
@@ -60,11 +53,6 @@ export const clearTokens = async (): Promise<void> => {
     throw error;
   }
 };
-
-interface UserInfoData extends User {
-  id: string;
-  timestamp: number;
-}
 
 // User info management with improved error handling
 export const getUserInfo = async (): Promise<UserInfoData | null> => {

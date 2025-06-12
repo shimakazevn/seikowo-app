@@ -1,5 +1,6 @@
 import CryptoJS from 'crypto-js';
-import { saveUserData, getUserData, deleteUserData } from './indexedDBUtils';
+import { saveDataToDB, getDataFromDB, deleteUserData, STORES } from './indexedDBUtils';
+import type { EncryptedData, SessionData, TokenResponse } from '../types/auth';
 
 // Constants
 const ENCRYPTION_KEY = import.meta.env.VITE_ENCRYPTION_KEY;
@@ -10,25 +11,6 @@ if (!ENCRYPTION_KEY) {
 const TOKEN_KEY = 'encrypted_token';
 const USER_DATA_KEY = 'encrypted_user_data';
 const SESSION_KEY = 'secure_session';
-
-interface EncryptedData {
-  value: string;
-  timestamp: number;
-}
-
-interface SessionData {
-  userData: any;
-  token: string;
-  refreshToken: string;
-  timestamp: number;
-  sessionId: string;
-  expiresAt: number;
-}
-
-interface TokenResponse {
-  accessToken: string;
-  refreshToken: string;
-}
 
 // Encryption helpers
 export const encryptData = <T>(data: T): string | null => {
@@ -73,7 +55,7 @@ export const encryptAndStoreToken = async (token: string): Promise<boolean> => {
     const encryptedToken = encryptData(token);
     if (!encryptedToken) return false;
     
-    await saveUserData(TOKEN_KEY, { value: encryptedToken, timestamp: Date.now() });
+    await saveDataToDB(STORES.USER_DATA, TOKEN_KEY, encryptedToken);
     return true;
   } catch (error: any) {
     console.error('Error storing encrypted token:', error);
@@ -84,7 +66,7 @@ export const encryptAndStoreToken = async (token: string): Promise<boolean> => {
 export const getAndDecryptToken = async (): Promise<string | null> => {
   try {
     console.log('[securityUtils] Attempting to get and decrypt token...');
-    const tokenData = await getUserData(TOKEN_KEY);
+    const tokenData = await getDataFromDB<EncryptedData>(STORES.USER_DATA, TOKEN_KEY);
     console.log('[securityUtils] Token data from IndexedDB:', tokenData ? 'exists' : 'not found');
     
     if (!tokenData?.value) {
@@ -108,7 +90,7 @@ export const encryptAndStoreUserData = async <T>(userData: T): Promise<boolean> 
     const encryptedData = encryptData(userData);
     if (!encryptedData) return false;
     
-    await saveUserData(USER_DATA_KEY, { value: encryptedData, timestamp: Date.now() });
+    await saveDataToDB(STORES.USER_DATA, USER_DATA_KEY, encryptedData);
     return true;
   } catch (error: any) {
     console.error('Error storing encrypted user data:', error);
@@ -119,7 +101,7 @@ export const encryptAndStoreUserData = async <T>(userData: T): Promise<boolean> 
 export const getAndDecryptUserData = async <T>(): Promise<T | null> => {
   try {
     console.log('[securityUtils] Attempting to get and decrypt user data...');
-    const userData = await getUserData(USER_DATA_KEY);
+    const userData = await getDataFromDB<EncryptedData>(STORES.USER_DATA, USER_DATA_KEY);
     console.log('[securityUtils] User data from IndexedDB:', userData ? 'exists' : 'not found');
     
     if (!userData?.value) {
@@ -202,8 +184,7 @@ export const createSecureSession = async (
       return false;
     }
     
-    await saveUserData(SESSION_KEY, { value: encryptedSession, timestamp: Date.now() });
-    console.log('Secure session created successfully');
+    await saveDataToDB(STORES.USER_DATA, SESSION_KEY, encryptedSession);
     return true;
   } catch (error: any) {
     console.error('Error creating secure session:', error);
@@ -214,7 +195,7 @@ export const createSecureSession = async (
 export const validateSession = async (): Promise<boolean> => {
   try {
     console.log('Validating session...');
-    const sessionData = await getUserData(SESSION_KEY);
+    const sessionData = await getDataFromDB<EncryptedData>(STORES.USER_DATA, SESSION_KEY);
     if (!sessionData?.value) {
       console.log('No secure session found');
       return false;

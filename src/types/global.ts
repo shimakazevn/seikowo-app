@@ -10,6 +10,7 @@ export interface Post {
   published: string;
   updated: string;
   timestamp?: number;
+  thumbnail?: string | null;
 }
 
 export interface BlogPost extends Post {
@@ -66,42 +67,45 @@ export interface MangaBookmark {
   verticalMode?: boolean;
 }
 
-export interface HistoryItem {
-  id: string;
-  title: string;
-  content: string;
-  labels: string[];
-  slug: string;
-  url: string;
-  timestamp: string;
+export interface HistoryItem extends Post {
+  timestamp: number;
 }
 
 export interface User {
+  id: string;
   sub: string;
+  email: string;
   name: string;
   given_name: string;
   family_name: string;
   picture: string;
-  email: string;
   email_verified: boolean;
   locale?: string;
-  is2FAEnabled?: boolean;
-  twoFactorSecret?: string | null;
-  isAuthenticated?: boolean;
-  id?: string;
-  updatedAt?: number;
-  timestamp?: number;
-  lastSyncTime?: number | null;
-  syncStatus?: 'idle' | 'loading' | 'success' | 'error';
+  is2FAEnabled: boolean;
+  twoFactorSecret: string | null;
+  isAuthenticated: boolean;
+  timestamp: number;
+  lastSyncTime: number | null;
+  syncStatus: 'idle' | 'loading' | 'success' | 'error';
+  updatedAt?: string;
 }
 
-export interface UserData extends Omit<User, 'id' | 'timestamp'> {
-  id: string; // Override id to be required
-  timestamp: number; // Override timestamp to be required
-  lastSyncTime?: number;
-  syncStatus?: 'idle' | 'loading' | 'success' | 'error';
-  twoFactorSecret?: string | null; // Make this optional but explicit
-  is2FAEnabled?: boolean; // Make this optional but explicit
+export interface UserData {
+  id: string;
+  sub: string;
+  email: string;
+  name: string;
+  given_name: string;
+  family_name: string;
+  picture: string;
+  email_verified: boolean;
+  locale?: string;
+  is2FAEnabled: boolean;
+  twoFactorSecret: string | null;
+  timestamp: number;
+  lastSyncTime: number | null;
+  syncStatus: 'idle' | 'loading' | 'success' | 'error';
+  updatedAt?: string;
 }
 
 export interface UserInfo {

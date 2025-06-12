@@ -20,13 +20,58 @@ import {
   deleteUserData,
   getUserData,
   saveUserData,
-  getDataFromDB
+  getDataFromDB,
+  initializeDatabase
 } from '../utils/indexedDBUtils';
 import { clearCachedData, CACHE_KEYS } from '../utils/cache';
 import { backupUserData, refreshToken, restoreUserData } from '../api/auth';
 import type { User, UserData } from '../types/global';
 
 console.log('[useUserStore.ts] File loaded. Initial localStorage value for store-key:', localStorage.getItem('user-storage'));
+
+const STORE_KEY = 'user-storage';
+
+// Separate function to initialize IndexedDB and validate persisted state
+export const initializePersistedState = async (): Promise<void> => {
+  try {
+    // Initialize IndexedDB first
+    await initializeDatabase();
+    
+    // Then validate the persisted state
+    const str = localStorage.getItem(STORE_KEY);
+    if (!str) return;
+
+    const data: StorageData = JSON.parse(str);
+    
+    // Check if we have a valid token
+    const token = await getAndDecryptToken();
+    if (!token) {
+      console.log('[useUserStore] No valid token found, clearing persisted state');
+      localStorage.removeItem(STORE_KEY);
+      return;
+    }
+
+    // Validate token with Google API
+    try {
+      const response = await fetch('https://www.googleapis.com/oauth2/v1/tokeninfo', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!response.ok) {
+        console.log('[useUserStore] Token validation failed, clearing persisted state');
+        localStorage.removeItem(STORE_KEY);
+        return;
+      }
+    } catch (error) {
+      console.error('[useUserStore] Error validating token:', error);
+      localStorage.removeItem(STORE_KEY);
+      return;
+    }
+  } catch (error) {
+    console.error('[useUserStore] Error initializing persisted state:', error);
+    localStorage.removeItem(STORE_KEY);
+  }
+};
 
 // Initial state
 const initialState = {
@@ -105,8 +150,6 @@ interface StorageData {
   timestamp: number;
 }
 
-const STORE_KEY = 'user-storage';
-
 const useUserStore = create<UserStore>()(
   persist(
     (set, get) => ({
@@ -126,6 +169,11 @@ const useUserStore = create<UserStore>()(
         }
 
         try {
+          // Initialize persisted state first
+          console.log('[useUserStore] Initializing persisted state...');
+          await initializePersistedState();
+          console.log('[useUserStore] Persisted state initialized.');
+
           // Load user data and token
           const [userData, accessToken] = await Promise.all([
             getAndDecryptUserData<UserData>(),
@@ -154,7 +202,9 @@ const useUserStore = create<UserStore>()(
               isAuthenticated: true,
               id: userData.id || userData.sub,
               updatedAt: userData.updatedAt,
-              timestamp: Number(Date.now())
+              timestamp: Number(Date.now()),
+              lastSyncTime: userData.lastSyncTime || null,
+              syncStatus: userData.syncStatus || 'idle',
             };
 
             const userId = user.sub || user.id;
@@ -197,7 +247,9 @@ const useUserStore = create<UserStore>()(
                   isAuthenticated: true,
                   id: userInfo.sub,
                   updatedAt: new Date().toISOString(),
-                  timestamp: Number(Date.now())
+                  timestamp: Number(Date.now()),
+                  lastSyncTime: null, // Initialize
+                  syncStatus: 'idle', // Initialize
                 };
 
                 // Save user data
@@ -269,28 +321,43 @@ const useUserStore = create<UserStore>()(
             }
             const validUserId: string = userId; // Ensure userId is a string
 
-            const userDataToSave: UserData = {
-              ...userData,
+            // Prepare data for IndexedDB (UserData type, without isAuthenticated)
+            const userDataToSaveDB: UserData = {
               id: userId,
-              timestamp: Date.now(),
+              sub: userData.sub,
+              email: userData.email,
+              name: userData.name,
+              given_name: userData.given_name,
+              family_name: userData.family_name,
+              picture: userData.picture,
+              email_verified: userData.email_verified,
+              locale: userData.locale,
               is2FAEnabled: userData.is2FAEnabled || false,
               twoFactorSecret: userData.twoFactorSecret || null,
-              lastSyncTime: userData.lastSyncTime || undefined,
+              timestamp: Date.now(),
+              lastSyncTime: userData.lastSyncTime || null,
               syncStatus: userData.syncStatus || 'idle',
+              updatedAt: userData.updatedAt, // Pass updatedAt if available
             };
 
             console.log('[useUserStore] setUser - saving userData to DB for userId:', userId);
-            await saveUserData(userId, userDataToSave);
+            await saveUserData(userId, userDataToSaveDB);
+
+            // Prepare data for store state (User type, with isAuthenticated)
+            const userForStore: User = {
+              ...userDataToSaveDB,
+              isAuthenticated: true,
+            };
 
             set({
-              user: userDataToSave,
+              user: userForStore,
               isAuthenticated: true,
               userId: userId,
               hasUserId: true,
-              is2FAEnabled: userDataToSave.is2FAEnabled,
-              is2FAVerified: userDataToSave.is2FAEnabled, // Assume verified on login if enabled
-              lastSyncTime: userDataToSave.lastSyncTime,
-              syncStatus: userDataToSave.syncStatus,
+              is2FAEnabled: userForStore.is2FAEnabled,
+              is2FAVerified: userForStore.is2FAEnabled, // Assume verified on login if enabled
+              lastSyncTime: userForStore.lastSyncTime,
+              syncStatus: userForStore.syncStatus,
             });
 
             if (accessToken && typeof accessToken === 'string' && typeof validUserId === 'string') {
@@ -368,22 +435,42 @@ const useUserStore = create<UserStore>()(
             if (!user) throw new Error('User not found');
             const userId = user.id || user.sub;
             if (!userId) throw new Error('User ID not found');
-            const userData: UserData = {
-              ...user,
+            
+            // Prepare data for IndexedDB (UserData type, without isAuthenticated)
+            const userDataDB: UserData = {
               id: userId,
-              timestamp: Date.now(),
+              sub: user.sub,
+              email: user.email,
+              name: user.name,
+              given_name: user.given_name,
+              family_name: user.family_name,
+              picture: user.picture,
+              email_verified: user.email_verified,
+              locale: user.locale,
               is2FAEnabled: true,
               twoFactorSecret: tempSecret,
-              lastSyncTime: get().lastSyncTime || undefined,
+              timestamp: Date.now(),
+              lastSyncTime: get().lastSyncTime || null,
               syncStatus: 'idle',
+              updatedAt: user.updatedAt,
             };
-            await saveUserData(userId, userData);
+
+            await saveUserData(userId, userDataDB);
+            
+            // Prepare data for store state (User type)
+            const userForStore: User = {
+              ...user,
+              is2FAEnabled: true,
+              twoFactorSecret: tempSecret,
+              isAuthenticated: user.isAuthenticated, // Keep existing isAuthenticated
+            };
+
             set({
               is2FAEnabled: true,
               is2FAVerified: true,
               temp2FASecret: null,
               temp2FACode: null,
-              user: userData
+              user: userForStore,
             });
             return true;
           } else {
@@ -428,20 +515,40 @@ const useUserStore = create<UserStore>()(
             if (!user) throw new Error('User not found');
             const userId = user.id || user.sub;
             if (!userId) throw new Error('User ID not found');
-            const userData: UserData = {
-              ...user,
+            
+            // Prepare data for IndexedDB (UserData type, without isAuthenticated)
+            const userDataDB: UserData = {
               id: userId,
-              timestamp: Date.now(),
+              sub: user.sub,
+              email: user.email,
+              name: user.name,
+              given_name: user.given_name,
+              family_name: user.family_name,
+              picture: user.picture,
+              email_verified: user.email_verified,
+              locale: user.locale,
               is2FAEnabled: false,
               twoFactorSecret: null,
-              lastSyncTime: get().lastSyncTime || undefined,
+              timestamp: Date.now(),
+              lastSyncTime: get().lastSyncTime || null,
               syncStatus: 'idle',
+              updatedAt: user.updatedAt,
             };
-            await saveUserData(userId, userData);
+
+            await saveUserData(userId, userDataDB);
+            
+            // Prepare data for store state (User type)
+            const userForStore: User = {
+              ...user,
+              is2FAEnabled: false,
+              twoFactorSecret: null,
+              isAuthenticated: user.isAuthenticated, // Keep existing isAuthenticated
+            };
+
             set({
               is2FAEnabled: false,
               is2FAVerified: false,
-              user: userData
+              user: userForStore,
             });
             return true;
           } else {
@@ -628,7 +735,13 @@ const useUserStore = create<UserStore>()(
           }
           clearUserInfo();
           clearCachedData(CACHE_KEYS.ATOM_POSTS);
-
+          
+          // Clear all persisted data
+          localStorage.removeItem(STORE_KEY);
+          localStorage.removeItem('refresh-token');
+          localStorage.removeItem('user-info');
+          
+          // Reset store state
           set({
             user: null,
             isAuthenticated: false,
@@ -648,6 +761,10 @@ const useUserStore = create<UserStore>()(
           });
         } catch (error) {
           console.error('[useUserStore] Error during logout:', error);
+          // Even if there's an error, try to clear localStorage
+          localStorage.removeItem(STORE_KEY);
+          localStorage.removeItem('refresh-token');
+          localStorage.removeItem('user-info');
         }
       },
 
@@ -707,24 +824,31 @@ const useUserStore = create<UserStore>()(
     {
       name: STORE_KEY,
       storage: {
-        getItem: (name: string): StorageValue<UserStoreState> | null => {
+        getItem: async (name: string): Promise<StorageValue<UserStoreState> | null> => {
           const str = localStorage.getItem(name);
           if (!str) return null;
           try {
-            const data = JSON.parse(str);
+            const data: StorageData = JSON.parse(str);
+            
             // Only persist non-sensitive data
             const userToPersist = data.state.user;
-            const serializedUser = userToPersist ? {
+            const serializedUser: User | null = userToPersist ? {
+              id: userToPersist.id || userToPersist.sub || '',
               sub: userToPersist.sub || '',
-              name: userToPersist.name || '',
-              given_name: userToPersist.given_name,
-              family_name: userToPersist.family_name,
-              picture: userToPersist.picture || '',
               email: userToPersist.email || '',
+              name: userToPersist.name || '',
+              given_name: userToPersist.given_name || '',
+              family_name: userToPersist.family_name || '',
+              picture: userToPersist.picture || '',
               email_verified: userToPersist.email_verified || false,
-              locale: userToPersist.locale,
-              id: userToPersist.id,
-              updatedAt: userToPersist.updatedAt,
+              locale: userToPersist.locale || undefined,
+              is2FAEnabled: data.state.is2FAEnabled || false,
+              twoFactorSecret: userToPersist.twoFactorSecret || null,
+              isAuthenticated: data.state.isAuthenticated || false,
+              timestamp: data.state.user?.timestamp || Date.now(),
+              lastSyncTime: data.state.lastSyncTime || null,
+              syncStatus: data.state.syncStatus || 'idle',
+              updatedAt: userToPersist.updatedAt || undefined,
             } : null;
 
             return {
@@ -734,7 +858,7 @@ const useUserStore = create<UserStore>()(
                 isAuthenticated: data.state.isAuthenticated,
                 is2FAEnabled: data.state.is2FAEnabled,
                 is2FAVerified: data.state.is2FAVerified,
-                lastSyncTime: data.state.lastSyncTime,
+                lastSyncTime: typeof data.state.lastSyncTime === 'number' ? data.state.lastSyncTime : null,
                 syncStatus: data.state.syncStatus,
                 syncError: data.state.syncError,
                 isOffline: data.state.isOffline,
@@ -743,7 +867,9 @@ const useUserStore = create<UserStore>()(
                 hasUserId: data.state.hasUserId,
               }
             };
-          } catch {
+          } catch (error) {
+            console.error('[useUserStore] Error parsing persisted state:', error);
+            localStorage.removeItem(name);
             return null;
           }
         },

@@ -57,7 +57,6 @@ import {
 } from 'react-icons/fa';
 import {
   FiUser,
-  FiBookmark,
   FiChevronRight,
   FiArrowLeft
 } from 'react-icons/fi';
@@ -89,25 +88,25 @@ interface UserDashboardTab {
 const USER_DASHBOARD_TABS: UserDashboardTab[] = [
   {
     id: 'favorite-posts',
-    label: 'Bài viết yêu thích',
+    label: 'favorites',
     icon: FaHeart,
-    description: 'Quản lý các bài viết đã yêu thích',
+    description: 'danh sách bài viết đã thích',
     color: '#ff6347', // Tomato
     component: FavoritePostsTab,
   },
   {
     id: 'bookmarked-manga',
-    label: 'Bookmark truyện',
-    icon: FiBookmark,
-    description: 'Quản lý các truyện đã bookmark',
+    label: 'bookmark',
+    icon: FaBookmark,
+    description: 'quản lý các truyện đã bookmark',
     color: '#20b2aa', // LightSeaGreen
     component: BookmarkedMangaTab,
   },
   {
     id: 'user-comments',
-    label: 'Bình luận của bạn',
+    label: 'comments',
     icon: FaComment,
-    description: 'Quản lý các bình luận đã đăng',
+    description: 'quản lý các bình luận đã đăng',
     color: '#3182ce', // Blue
     component: UserCommentsTab,
   },

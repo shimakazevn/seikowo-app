@@ -4,10 +4,6 @@ import {
   VStack,
   HStack,
   Text,
-  Card,
-  CardBody,
-  Image,
-  SimpleGrid,
   Wrap,
   WrapItem,
   Tag,
@@ -24,12 +20,27 @@ import {
   ModalFooter,
   ModalBody,
   ModalCloseButton,
+  Spacer,
 } from '@chakra-ui/react';
-import { FaClock, FaTrash } from 'react-icons/fa';
+import { FaClock, FaTrash, FaExternalLinkAlt } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 import useFavoriteBookmarkStore from '../../../store/useFollowBookmarkStore';
 import useUserStore from '../../../store/useUserStore';
 import type { FavoritePost } from '../../../types/global';
+
+// Helper function to normalize timestamp
+const normalizeTimestamp = (post: FavoritePost): number => {
+  // Try to get timestamp from favoriteAt first
+  if (post.favoriteAt && !isNaN(Number(post.favoriteAt))) {
+    return Number(post.favoriteAt);
+  }
+  // Then try timestamp
+  if (post.timestamp && !isNaN(Number(post.timestamp))) {
+    return Number(post.timestamp);
+  }
+  // If both are invalid, use current time
+  return Date.now();
+};
 
 interface FavoritePostsTabProps {
   favoritesPosts: FavoritePost[];
@@ -75,44 +86,62 @@ const FavoritePostsTab: React.FC<FavoritePostsTabProps> = ({
           Bạn chưa yêu thích bài viết nào.
         </Text>
       ) : (
-        <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={{ base: 4, md: 6 }}>
+        <VStack spacing={0} align="stretch">
           {favoritesPosts.map((post) => (
-            <Card key={post.id} bg={cardBg} borderRadius="lg" shadow="md">
-              <CardBody p={{ base: 3, md: 4 }}>
-                <VStack align="stretch" spacing={{ base: 2, md: 3 }}>
-                  {post.thumbnail && (
-                    <Image
-                      src={post.thumbnail}
-                      alt={post.title}
-                      borderRadius="md"
-                      objectFit="cover"
-                      height={{ base: "120px", md: "150px" }}
-                      width="100%"
-                    />
-                  )}
+            <Box 
+              key={post.id} 
+              p={2} 
+              borderBottom="1px solid" 
+              borderColor={isDark ? "gray.700" : "gray.200"} 
+              _last={{ borderBottom: "none" }}
+            >
+                <VStack align="stretch" spacing={0.5}>
                   <Link to={post.url} target="_blank">
-                    <Text fontSize={{ base: "md", md: "lg" }} fontWeight="bold" color={textColor} _hover={{ color: accentColor }}>
+                    <Text 
+                      fontSize="lg" 
+                      fontWeight="bold" 
+                      color={textColor} 
+                      _hover={{ color: accentColor }}
+                      noOfLines={2}
+                    >
                       {post.title}
                     </Text>
                   </Link>
+                  
                   <Wrap spacing={1}>
-                    {post.labels && post.labels.map((label: string, idx: number) => (
-                      <WrapItem key={idx}>
-                        <Tag size={{ base: "sm", md: "md" }} variant="subtle" colorScheme="cyan">
+                    {post.labels && post.labels.map((label: string, index: number) => (
+                      <WrapItem key={`${post.id}-${label}-${index}`}>
+                        <Tag size="sm" variant="subtle" colorScheme="cyan">
                           <TagLabel>{label}</TagLabel>
                         </Tag>
                       </WrapItem>
                     ))}
                   </Wrap>
-                  <HStack spacing={2} color={mutedColor}>
+
+                  <HStack key={`${post.id}-metadata`} spacing={1}>
                     <Icon as={FaClock} />
-                    <Text>{new Date(post.favoriteAt || post.timestamp).toLocaleDateString()}</Text>
-                  </HStack>
-                  <HStack spacing={2}>
-                    <Link to={post.url} target="_blank">
-                      <Button size="sm" colorScheme="blue" leftIcon={<Icon as={FaClock} />}>
-                        Đọc ngay
-                      </Button>
+                    <Text>
+                      {(() => {
+                        const timestamp = normalizeTimestamp(post);
+                        const date = new Date(timestamp);
+                        return date.toLocaleDateString('vi-VN', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        });
+                      })()}
+                    </Text>
+                    <Spacer />
+                    <Link to={post.url} target="_blank" style={{ textDecoration: 'none' }}>
+                      <HStack 
+                        spacing={1} 
+                        _hover={{ color: accentColor }} 
+                        cursor="pointer" 
+                        color={mutedColor}
+                      >
+                        <Icon as={FaExternalLinkAlt} />
+                        <Text fontWeight="bold">Đọc bài viết</Text>
+                      </HStack>
                     </Link>
                     <IconButton
                       aria-label="Xóa khỏi yêu thích"
@@ -124,10 +153,9 @@ const FavoritePostsTab: React.FC<FavoritePostsTabProps> = ({
                     />
                   </HStack>
                 </VStack>
-              </CardBody>
-            </Card>
+            </Box>
           ))}
-        </SimpleGrid>
+        </VStack>
       )}
 
       {/* Confirmation Modal */}

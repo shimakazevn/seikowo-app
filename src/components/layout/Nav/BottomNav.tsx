@@ -9,7 +9,7 @@ import {
   useColorMode
 } from '@chakra-ui/react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { MenuItem } from '../../types/navigation';
+import { MenuItem } from '../../../types/navigation';
 import { BOTTOM_NAV_HEIGHT, NAV_Z_INDEX, NAV_COLORS } from './NavConstants';
 
 interface BottomNavProps {

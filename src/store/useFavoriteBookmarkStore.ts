@@ -1,20 +1,12 @@
 import { create } from 'zustand';
 import { getHistoryData, saveHistoryData } from '../utils/indexedDBUtils';
 import { backupUserData, restoreUserData, deleteUserData } from '../api/auth';
-import { MAX_BOOKMARKS } from '../utils/postUtils';
-import { extractImage } from '../utils/blogUtils';
-import type { FavoritePost, MangaBookmark, ToastFunction, Post } from '../types';
-
-// Interfaces
+import type { FavoritePost, MangaBookmark, Post, ToastFunction } from '../types';
 
 interface SyncResult {
-  favoriteCount: number;
-  bookmarkCount: number;
-  synced: boolean;
-  changes: {
-    favorites: number;
-    bookmarks: number;
-  };
+  favorites: FavoritePost[];
+  bookmarks: MangaBookmark[];
+  readPosts: any[];
 }
 
 interface FavoriteBookmarkStore {
@@ -29,49 +21,46 @@ interface FavoriteBookmarkStore {
   toggleBookmark: (mangaData: MangaBookmark, userId: string, accessToken: string | null, toast?: ToastFunction) => Promise<boolean>;
   isBookmarked: (mangaId: string) => boolean;
   getBookmarkData: (mangaId: string) => MangaBookmark | undefined;
-  resetStore: () => void;
+  syncGuestData: (userId: string, toast?: ToastFunction) => Promise<SyncResult | false>;
   syncData: (userId: string, accessToken: string | null, toast?: ToastFunction) => Promise<boolean>;
+  resetStore: () => void;
 }
 
 const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>((set, get) => ({
-  // State
   favorites: [],
   bookmarks: [],
   loading: false,
   error: null,
 
-  // Actions
-  initialize: async (userId: string): Promise<void> => {
-    if (!userId) return;
+  initialize: async (userId: string) => {
+    if (!userId || userId === 'guest') {
+      set({ loading: false, error: 'Cần đăng nhập' });
+      return;
+    }
 
     set({ loading: true, error: null });
     try {
-      const [favoritesRaw, bookmarksRaw] = await Promise.all([
+      const [localFavorites, localBookmarks] = await Promise.all([
         getHistoryData('favorites', userId),
         getHistoryData('bookmarks', userId)
       ]);
 
-      const favorites = favoritesRaw as FavoritePost[];
-      const bookmarks = bookmarksRaw as MangaBookmark[];
-
       set({
-        favorites: (Array.isArray(favorites) ? favorites : []) as FavoritePost[],
-        bookmarks: (Array.isArray(bookmarks) ? bookmarks : []) as MangaBookmark[],
+        favorites: Array.isArray(localFavorites) ? localFavorites as FavoritePost[] : [],
+        bookmarks: Array.isArray(localBookmarks) ? localBookmarks as MangaBookmark[] : [],
         loading: false
       });
-      console.log('[useFavoriteBookmarkStore] Favorites after initialization:', get().favorites);
     } catch (error: any) {
-      console.error('Error initializing favorite/bookmark store:', error);
-      set({ error: 'Failed to load data', loading: false });
+      console.error('Error initializing:', error);
+      set({ error: 'Failed to initialize', loading: false });
     }
   },
 
-  // Favorite actions
   toggleFavorite: async (post: Post, userId: string, accessToken: string | null, toast?: ToastFunction): Promise<boolean> => {
     if (!userId || userId === 'guest') {
       toast?.({
         title: 'Cần đăng nhập',
-        description: 'Vui lòng đăng nhập để sử dụng tính năng favorite',
+        description: 'Vui lòng đăng nhập để thêm vào danh sách yêu thích',
         status: 'warning',
         duration: 3000,
         isClosable: true,
@@ -88,34 +77,29 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>((set, get) => ({
         updatedFavorites = favorites.filter(item => item.id !== post.id);
       } else {
         const newFavorite: FavoritePost = {
-          id: post.id,
+          id: post.id!,
           title: post.title,
           url: post.url,
           published: post.published,
-          updated: post.updated,
-          labels: post.labels,
-          thumbnail: post.thumbnail || (post.content ? extractImage(post.content) : null),
-          favoriteAt: Date.now(),
+          updated: post.updated || post.published,
+          labels: post.labels || [],
           timestamp: Date.now(),
+          favoriteAt: Date.now(),
         };
-        updatedFavorites = [newFavorite, ...favorites].slice(0, 1000);
+        updatedFavorites = [newFavorite, ...favorites];
       }
-      console.log('[useFavoriteBookmarkStore] Before saving favorites, updatedFavorites:', updatedFavorites);
 
-      userId ? await saveHistoryData('favorites', userId, updatedFavorites) : Promise.resolve();
+      await saveHistoryData('favorites', userId, updatedFavorites);
       set({ favorites: updatedFavorites });
-      console.log('[useFavoriteBookmarkStore] Favorites after toggleFavorite:', get().favorites);
 
       // Backup to Google Drive if logged in
       if (accessToken) {
         try {
-          const backupData = {
+          await backupUserData(userId, {
             favoritePosts: updatedFavorites,
             mangaBookmarks: get().bookmarks,
-            readPosts: userId ? await getHistoryData('reads', userId) : []
-          };
-          await backupUserData(userId, backupData);
-          console.log('Backup to Google Drive successful');
+            readPosts: await getHistoryData('reads', userId) || []
+          });
         } catch (error: any) {
           console.error('Error backing up to Google Drive:', error);
           toast?.({
@@ -130,7 +114,7 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>((set, get) => ({
 
       toast?.({
         title: isCurrentlyFavorited ? 'Đã bỏ yêu thích' : 'Đã yêu thích',
-        description: isCurrentlyFavorited ? 'Bạn đã bỏ yêu thích truyện này' : 'Bạn đã yêu thích truyện này',
+        description: isCurrentlyFavorited ? 'Bạn đã bỏ yêu thích bài viết này' : 'Bạn đã yêu thích bài viết này',
         status: 'success',
         duration: 3000,
         isClosable: true,
@@ -154,7 +138,7 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>((set, get) => ({
     if (!userId || userId === 'guest') {
       toast?.({
         title: 'Cần đăng nhập',
-        description: 'Vui lòng đăng nhập để sử dụng tính năng yêu thích',
+        description: 'Vui lòng đăng nhập để xóa khỏi danh sách yêu thích',
         status: 'warning',
         duration: 3000,
         isClosable: true,
@@ -168,7 +152,6 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>((set, get) => ({
       
       await saveHistoryData('favorites', userId, updatedFavorites);
       set({ favorites: updatedFavorites });
-      console.log('[useFavoriteBookmarkStore] Favorites after removeFavorite:', get().favorites);
 
       toast?.({
         title: 'Đã xóa',
@@ -196,7 +179,6 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>((set, get) => ({
     return get().favorites.some(item => item.id === postId);
   },
 
-  // Bookmark actions
   toggleBookmark: async (mangaData: MangaBookmark, userId: string, accessToken: string | null, toast?: ToastFunction): Promise<boolean> => {
     if (!userId || userId === 'guest') {
       toast?.({
@@ -218,31 +200,23 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>((set, get) => ({
         updatedBookmarks = bookmarks.filter(b => b.id !== mangaData.id);
       } else {
         const newBookmark: MangaBookmark = {
-          id: mangaData.id,
-          title: mangaData.title,
-          url: mangaData.url,
-          currentPage: mangaData.currentPage,
-          totalPages: mangaData.totalPages,
-          verticalMode: mangaData.verticalMode,
-          timestamp: Date.now(),
+          ...mangaData,
+          timestamp: Date.now()
         };
-        updatedBookmarks = [newBookmark, ...bookmarks].slice(0, MAX_BOOKMARKS);
+        updatedBookmarks = [newBookmark, ...bookmarks];
       }
-      console.log('[useFollowBookmarkStore] Before saving bookmarks, updatedBookmarks:', updatedBookmarks);
 
-      userId ? await saveHistoryData('bookmarks', userId, updatedBookmarks) : Promise.resolve();
+      await saveHistoryData('bookmarks', userId, updatedBookmarks);
       set({ bookmarks: updatedBookmarks });
 
       // Backup to Google Drive if logged in
       if (accessToken) {
         try {
-          const backupData = {
+          await backupUserData(userId, {
             favoritePosts: get().favorites,
             mangaBookmarks: updatedBookmarks,
-            readPosts: userId ? await getHistoryData('reads', userId) : []
-          };
-          await backupUserData(userId, backupData);
-          console.log('Backup to Google Drive successful');
+            readPosts: await getHistoryData('reads', userId) || []
+          });
         } catch (error: any) {
           console.error('Error backing up to Google Drive:', error);
         }
@@ -278,7 +252,108 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>((set, get) => ({
     return get().bookmarks.find(item => item.id === mangaId);
   },
 
-  // Sync actions
+  syncGuestData: async (userId: string, toast?: ToastFunction): Promise<SyncResult | false> => {
+    if (!userId || userId === 'guest') {
+      toast?.({
+        title: 'Cần đăng nhập',
+        description: 'Vui lòng đăng nhập để đồng bộ dữ liệu',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
+      return false;
+    }
+
+    set({ loading: true, error: null });
+    try {
+      const [localFavorites, localBookmarks, driveData] = await Promise.all([
+        getHistoryData('favorites', userId),
+        getHistoryData('bookmarks', userId),
+        restoreUserData(userId)
+      ]);
+
+      if (!driveData) {
+        const result = {
+          favorites: Array.isArray(localFavorites) ? localFavorites as FavoritePost[] : [],
+          bookmarks: Array.isArray(localBookmarks) ? localBookmarks as MangaBookmark[] : [],
+          readPosts: await getHistoryData('reads', userId) || []
+        };
+        set({
+          favorites: result.favorites,
+          bookmarks: result.bookmarks,
+          loading: false
+        });
+        return result;
+      }
+
+      const mergeArrays = <T extends { id: string; favoriteAt?: number; timestamp?: number }>(
+        local: T[] | any,
+        drive: T[] | any,
+        timestampKey: 'favoriteAt' | 'timestamp'
+      ): T[] => {
+        const localArray = Array.isArray(local) ? local : [];
+        const driveArray = Array.isArray(drive) ? drive : [];
+        const merged = [...localArray, ...driveArray];
+        const unique = Array.from(new Map(merged.map(item => [item.id, item])).values());
+        return unique.sort((a, b) => (b[timestampKey] || 0) - (a[timestampKey] || 0));
+      };
+
+      const mergedFavorites = mergeArrays<FavoritePost>(
+        localFavorites,
+        driveData.favoritePosts,
+        'favoriteAt'
+      );
+      const mergedBookmarks = mergeArrays<MangaBookmark>(
+        localBookmarks,
+        driveData.mangaBookmarks,
+        'timestamp'
+      );
+
+      await Promise.all([
+        saveHistoryData('favorites', userId, mergedFavorites),
+        saveHistoryData('bookmarks', userId, mergedBookmarks),
+        backupUserData(userId, {
+          favoritePosts: mergedFavorites,
+          mangaBookmarks: mergedBookmarks,
+          readPosts: await getHistoryData('reads', userId) || []
+        })
+      ]);
+
+      const result = {
+        favorites: mergedFavorites,
+        bookmarks: mergedBookmarks,
+        readPosts: await getHistoryData('reads', userId) || []
+      };
+
+      set({
+        favorites: result.favorites,
+        bookmarks: result.bookmarks,
+        loading: false
+      });
+
+      toast?.({
+        title: 'Đồng bộ thành công',
+        description: 'Dữ liệu đã được đồng bộ giữa thiết bị và Google Drive',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+
+      return result;
+    } catch (error: any) {
+      console.error('Error syncing guest data:', error);
+      set({ error: 'Failed to sync guest data', loading: false });
+      toast?.({
+        title: 'Lỗi đồng bộ',
+        description: 'Không thể đồng bộ dữ liệu giữa thiết bị và Google Drive',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      return false;
+    }
+  },
+
   syncData: async (userId: string, accessToken: string | null, toast?: ToastFunction): Promise<boolean> => {
     if (!userId || userId === 'guest') {
       toast?.({
@@ -293,29 +368,29 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>((set, get) => ({
 
     set({ loading: true, error: null });
     try {
-      const [localFavoritesRaw, localBookmarksRaw, localReadsRaw] = await Promise.all([
+      // Get local data first
+      const [localFavorites, localBookmarks] = await Promise.all([
         getHistoryData('favorites', userId),
-        getHistoryData('bookmarks', userId),
-        getHistoryData('reads', userId)
+        getHistoryData('bookmarks', userId)
       ]);
 
-      const localFavorites = localFavoritesRaw as FavoritePost[];
-      const localBookmarks = localBookmarksRaw as MangaBookmark[];
-      const localReads = localReadsRaw as any[];
-
+      // Try to get data from Drive
       let driveData = null;
       try {
         driveData = await restoreUserData(userId);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.warn('Error restoring from Drive, will use local data only:', error);
-        // If file doesn't exist or access denied, create new file on Drive with local data
+        // If file doesn't exist or access denied, create new file
         if (error instanceof Error && 
             (error.message?.includes('Failed to fetch') || error.message?.includes('not found'))) {
           try {
+            // Delete old file if exists
+            await deleteUserData(userId);
+            // Create new file with local data
             await backupUserData(userId, {
               favoritePosts: Array.isArray(localFavorites) ? localFavorites : [],
               mangaBookmarks: Array.isArray(localBookmarks) ? localBookmarks : [],
-              readPosts: Array.isArray(localReads) ? localReads : []
+              readPosts: await getHistoryData('reads', userId) || []
             });
             toast?.({
               title: 'Đã tạo mới',
@@ -337,7 +412,22 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>((set, get) => ({
         }
       }
 
-      const mergeArrays = <T extends { id: string; favoriteAt?: number; timestamp?: number }>(local: T[] | any, drive: T[] | any, timestampKey: 'favoriteAt' | 'timestamp'): T[] => {
+      // If no drive data, use local data
+      if (!driveData) {
+        set({
+          favorites: Array.isArray(localFavorites) ? localFavorites as FavoritePost[] : [],
+          bookmarks: Array.isArray(localBookmarks) ? localBookmarks as MangaBookmark[] : [],
+          loading: false
+        });
+        return true;
+      }
+
+      // Merge local and drive data
+      const mergeArrays = <T extends { id: string; favoriteAt?: number; timestamp?: number }>(
+        local: T[] | any,
+        drive: T[] | any,
+        timestampKey: 'favoriteAt' | 'timestamp'
+      ): T[] => {
         const localArray = Array.isArray(local) ? local : [];
         const driveArray = Array.isArray(drive) ? drive : [];
         const merged = [...localArray, ...driveArray];
@@ -345,26 +435,26 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>((set, get) => ({
         return unique.sort((a, b) => (b[timestampKey] || 0) - (a[timestampKey] || 0));
       };
 
-      let mergedFavorites: FavoritePost[];
-      let mergedBookmarks: MangaBookmark[];
-      let mergedReads: any[];
+      const mergedFavorites = mergeArrays<FavoritePost>(
+        localFavorites,
+        driveData.favoritePosts,
+        'favoriteAt'
+      );
+      const mergedBookmarks = mergeArrays<MangaBookmark>(
+        localBookmarks,
+        driveData.mangaBookmarks,
+        'timestamp'
+      );
 
-      if (driveData) {
-        mergedFavorites = mergeArrays<FavoritePost>(localFavorites, driveData.favoritePosts, 'favoriteAt');
-        mergedBookmarks = mergeArrays<MangaBookmark>(localBookmarks, driveData.mangaBookmarks, 'timestamp');
-        mergedReads = mergeArrays<any>(localReads, driveData.readPosts, 'timestamp'); // Assuming readPosts also have a timestamp
-      } else {
-        // If no drive data (either not found or error), use local data as merged data
-        mergedFavorites = Array.isArray(localFavorites) ? localFavorites : [];
-        mergedBookmarks = Array.isArray(localBookmarks) ? localBookmarks : [];
-        mergedReads = Array.isArray(localReads) ? localReads : [];
-      }
-
-      // Save merged data to IndexedDB
+      // Save merged data to both IndexedDB and Drive
       await Promise.all([
         saveHistoryData('favorites', userId, mergedFavorites),
         saveHistoryData('bookmarks', userId, mergedBookmarks),
-        saveHistoryData('reads', userId, mergedReads),
+        backupUserData(userId, {
+          favoritePosts: mergedFavorites,
+          mangaBookmarks: mergedBookmarks,
+          readPosts: await getHistoryData('reads', userId) || []
+        })
       ]);
 
       set({
@@ -373,30 +463,13 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>((set, get) => ({
         loading: false
       });
 
-      // Always backup to Google Drive after merge (this is the key change for the new flow)
-      try {
-        await backupUserData(userId, {
-          favoritePosts: mergedFavorites,
-          mangaBookmarks: mergedBookmarks,
-          readPosts: mergedReads
-        });
-        toast?.({
-          title: 'Đồng bộ thành công',
-          description: 'Dữ liệu đã được đồng bộ giữa thiết bị và Google Drive',
-          status: 'success',
-          duration: 3000,
-          isClosable: true,
-        });
-      } catch (backupError: unknown) {
-        console.error('Error backing up merged data to Google Drive:', backupError);
-        toast?.({
-          title: 'Lỗi sao lưu',
-          description: 'Không thể sao lưu dữ liệu đã đồng bộ lên Google Drive',
-          status: 'error',
-          duration: 3000,
-          isClosable: true,
-        });
-      }
+      toast?.({
+        title: 'Đồng bộ thành công',
+        description: 'Dữ liệu đã được đồng bộ giữa thiết bị và Google Drive',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
 
       return true;
     } catch (error: any) {
@@ -413,8 +486,14 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>((set, get) => ({
     }
   },
 
-  // New reset action
-  resetStore: () => set({ favorites: [], bookmarks: [], loading: false, error: null }),
+  resetStore: () => {
+    set({
+      favorites: [],
+      bookmarks: [],
+      loading: false,
+      error: null
+    });
+  },
 }));
 
-export default useFavoriteBookmarkStore;
+export default useFavoriteBookmarkStore; 

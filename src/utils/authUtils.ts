@@ -1,7 +1,6 @@
 import {
   getUserInfo,
-  backupUserData,
-  isTokenValid
+  backupUserData
 } from '../api/auth';
 import { clearEncryptedData } from './securityUtils';
 import {
@@ -28,7 +27,6 @@ interface UserData {
   timestamp: number;
   lastSyncTime: number;
   syncStatus: {
-    totalFollows: number;
     totalBookmarks: number;
   };
   accessToken?: string;
@@ -63,7 +61,7 @@ export const handleLogout = async ({ userId, navigate, toast, onClose }: LogoutP
         const favoritePosts = userId ? await getHistoryData('favorites', userId) : [];
         const readPosts = userId ? await getHistoryData('reads', userId) : [];
         const mangaBookmarks = userId ? await getHistoryData('bookmarks', userId) : [];
-        await backupUserData(accessToken, userId, { readPosts, favoritePosts, mangaBookmarks });
+        await backupUserData(userId, { readPosts, favoritePosts, mangaBookmarks });
         toast({ title: "Đã sao lưu dữ liệu", description: "Dữ liệu của bạn đã được sao lưu lên Google Drive", status: "success", duration: 2000 });
       } catch (error: any) {
         console.error('Error backing up data:', error);
@@ -71,7 +69,6 @@ export const handleLogout = async ({ userId, navigate, toast, onClose }: LogoutP
       }
     }
     userId ? await saveHistoryData('bookmarks', userId, []) : Promise.resolve();
-    userId ? await saveHistoryData('follows', userId, []) : Promise.resolve();
     userId ? await saveHistoryData('reads', userId, []) : Promise.resolve();
     await deleteUserDataFromDB(userId);
     await clearEncryptedData();
@@ -104,10 +101,8 @@ export const handleLogin = async ({
     await clearEncryptedData();
     await deleteUserDataFromDB('guest');
     const mergedData = {
-      follows: await getHistoryData('follows', 'guest'),
       bookmarks: await getHistoryData('bookmarks', 'guest')
     };
-    await saveHistoryData('follows', userInfo.sub, mergedData.follows || []);
     await saveHistoryData('bookmarks', userInfo.sub, mergedData.bookmarks || []);
     const userData: UserData = {
       id: userInfo.sub,
@@ -122,7 +117,6 @@ export const handleLogin = async ({
       timestamp: Date.now(),
       lastSyncTime: Date.now(),
       syncStatus: {
-        totalFollows: mergedData.follows?.length || 0,
         totalBookmarks: mergedData.bookmarks?.length || 0
       }
     };

@@ -21,7 +21,7 @@ import { bloggerAdminService, BloggerPost, CreatePostRequest } from '../../../se
 import { authService } from '../../../services/authService';
 import RichTextEditor from './RichTextEditor';
 import AdminPostCard from './AdminPostCard';
-import { useAuthGuard } from "../../features/Auth/LoginNotificationProvider";
+import { useAuthGuard } from "../../../hooks/useAuthGuard";
 import EditPostForm from './EditPostForm';
 
 interface PostFormData {
