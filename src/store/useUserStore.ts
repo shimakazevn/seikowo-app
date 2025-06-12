@@ -26,29 +26,44 @@ import {
 import { clearCachedData, CACHE_KEYS } from '../utils/cache';
 import { backupUserData, refreshToken, restoreUserData } from '../api/auth';
 import type { User, UserData } from '../types/global';
+import useFavoriteBookmarkStore from './useFavoriteBookmarkStore';
 
 console.log('[useUserStore.ts] File loaded. Initial localStorage value for store-key:', localStorage.getItem('user-storage'));
 
 const STORE_KEY = 'user-storage';
 
 // Separate function to initialize IndexedDB and validate persisted state
-export const initializePersistedState = async (): Promise<void> => {
+export const initializePersistedState = async (): Promise<boolean> => {
   try {
     // Initialize IndexedDB first
     await initializeDatabase();
     
     // Then validate the persisted state
     const str = localStorage.getItem(STORE_KEY);
-    if (!str) return;
+    if (!str) {
+      console.log('[useUserStore] No persisted state found.');
+      return false; // No persisted state, so no valid token
+    }
 
-    const data: StorageData = JSON.parse(str);
-    
     // Check if we have a valid token
     const token = await getAndDecryptToken();
     if (!token) {
-      console.log('[useUserStore] No valid token found, clearing persisted state');
-      localStorage.removeItem(STORE_KEY);
-      return;
+      console.log('[useUserStore] No valid token found in encrypted storage, attempting to refresh...');
+      const refreshTokenValue = await getRefreshToken();
+      if (refreshTokenValue) {
+        try {
+          const newToken = await refreshToken(refreshTokenValue);
+          if (newToken) {
+            console.log('[useUserStore] Successfully refreshed token.');
+            await encryptAndStoreToken(newToken);
+            return true; // Token refreshed and stored
+          }
+        } catch (error) {
+          console.error('[useUserStore] Error refreshing token during initializePersistedState:', error);
+        }
+      }
+      console.log('[useUserStore] No valid token and refresh failed.');
+      return false; // No valid token and refresh failed
     }
 
     // Validate token with Google API
@@ -58,18 +73,32 @@ export const initializePersistedState = async (): Promise<void> => {
       });
       
       if (!response.ok) {
-        console.log('[useUserStore] Token validation failed, clearing persisted state');
-        localStorage.removeItem(STORE_KEY);
-        return;
+        console.log('[useUserStore] Token validation failed with Google API, attempting to refresh...');
+        const refreshTokenValue = await getRefreshToken();
+        if (refreshTokenValue) {
+          try {
+            const newToken = await refreshToken(refreshTokenValue);
+            if (newToken) {
+              console.log('[useUserStore] Successfully refreshed token after API validation failure.');
+              await encryptAndStoreToken(newToken);
+              return true; // Token refreshed and stored
+            }
+          } catch (error) {
+            console.error('[useUserStore] Error refreshing token after API validation:', error);
+          }
+        }
+        console.log('[useUserStore] Token validation failed and refresh failed.');
+        return false; // Token validation failed and refresh failed
       }
+      console.log('[useUserStore] Token successfully validated with Google API.');
+      return true; // Token is valid
     } catch (error) {
-      console.error('[useUserStore] Error validating token:', error);
-      localStorage.removeItem(STORE_KEY);
-      return;
+      console.error('[useUserStore] Error validating token with Google API:', error);
+      return false; // Error validating token
     }
   } catch (error) {
-    console.error('[useUserStore] Error initializing persisted state:', error);
-    localStorage.removeItem(STORE_KEY);
+    console.error('[useUserStore] Unexpected error during initializePersistedState:', error);
+    return false; // General error during initialization
   }
 };
 
@@ -90,6 +119,9 @@ const initialState = {
   temp2FACode: null as string | null,
   hasAccessToken: false,
   hasUserId: false,
+  isRestoringData: false,
+  restoreProgress: 0,
+  restoreStatus: '',
 };
 
 // Store state type
@@ -109,6 +141,9 @@ type UserStoreState = {
   hasAccessToken: boolean;
   temp2FASecret: string | null;
   temp2FACode: string | null;
+  isRestoringData: boolean;
+  restoreProgress: number;
+  restoreStatus: string;
 };
 
 // Store state interface
@@ -159,22 +194,20 @@ const useUserStore = create<UserStore>()(
         const currentStoreState = get();
         console.log('[useUserStore] initializeUser called. Current storeReady:', currentStoreState.storeReady);
 
-        // Only skip if store is already ready, authenticated, AND has an accessToken AND has user data
-        if (currentStoreState.storeReady && 
-            currentStoreState.isAuthenticated && 
-            currentStoreState.hasAccessToken && 
-            currentStoreState.user) {
-          console.log('[useUserStore] Store already ready and fully authenticated. Skipping initialization.');
-          return true;
-        }
-
         try {
-          // Initialize persisted state first
-          console.log('[useUserStore] Initializing persisted state...');
-          await initializePersistedState();
-          console.log('[useUserStore] Persisted state initialized.');
+          // Initialize persisted state first to ensure token validity
+          console.log('[useUserStore] Initializing persisted state for user...');
+          const hasValidToken = await initializePersistedState();
+          console.log('[useUserStore] Persisted state initialized. Has valid token:', hasValidToken);
 
-          // Load user data and token
+          if (!hasValidToken) {
+            console.log('[useUserStore] No valid token after persistence initialization, logging out.');
+            await get().logout();
+            set({ storeReady: true }); // Ensure store is marked ready even if not authenticated
+            return false;
+          }
+
+          // Load user data and token from encrypted storage
           const [userData, accessToken] = await Promise.all([
             getAndDecryptUserData<UserData>(),
             getAndDecryptToken()
@@ -185,9 +218,9 @@ const useUserStore = create<UserStore>()(
             hasToken: !!accessToken
           });
 
-          // Case 1: Both user data and token exist
+          // If both user data and token exist, set authenticated state
           if (userData && accessToken) {
-            console.log('[useUserStore] Both user data and token found, setting authenticated state');
+            console.log('[useUserStore] Both user data and token found, setting authenticated state.');
             const user: User = {
               sub: userData.sub,
               name: userData.name,
@@ -217,94 +250,81 @@ const useUserStore = create<UserStore>()(
               userId,
               hasAccessToken: true
             });
+
+            // Also sync favorite and bookmark data after user initialization
+            if (userId && typeof userId === 'string') {
+              await useFavoriteBookmarkStore.getState().syncData(userId, accessToken);
+            }
             return true;
           }
 
-          // Case 2: Only token exists but no user data
-          if (!userData && accessToken) {
-            console.log('[useUserStore] Token exists but no user data found. Attempting to restore user data...');
+          // If for some reason we have a valid token but no user data (should be rare now)
+          console.log('[useUserStore] Valid token exists but no user data, attempting to fetch user info.');
+          const latestAccessToken = await getAndDecryptToken(); // Get the most recent token
+
+          if (latestAccessToken) {
             try {
-              // Try to get user info from Google API
               const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
+                headers: { 'Authorization': `Bearer ${latestAccessToken}` }
               });
 
               if (response.ok) {
                 const userInfo = await response.json();
-                console.log('[useUserStore] Retrieved user info from Google:', userInfo);
+                if (userInfo.sub) {
+                  const user: User = {
+                    sub: userInfo.sub,
+                    name: userInfo.name,
+                    given_name: userInfo.given_name,
+                    family_name: userInfo.family_name,
+                    picture: userInfo.picture,
+                    email: userInfo.email,
+                    email_verified: userInfo.email_verified,
+                    locale: userInfo.locale,
+                    is2FAEnabled: false,
+                    twoFactorSecret: null,
+                    isAuthenticated: true,
+                    id: userInfo.sub,
+                    updatedAt: new Date().toISOString(),
+                    timestamp: Number(Date.now()),
+                    lastSyncTime: null,
+                    syncStatus: 'idle',
+                  };
 
-                const user: User = {
-                  sub: userInfo.sub,
-                  name: userInfo.name,
-                  given_name: userInfo.given_name,
-                  family_name: userInfo.family_name,
-                  picture: userInfo.picture,
-                  email: userInfo.email,
-                  email_verified: userInfo.email_verified,
-                  locale: userInfo.locale,
-                  is2FAEnabled: false,
-                  twoFactorSecret: null,
-                  isAuthenticated: true,
-                  id: userInfo.sub,
-                  updatedAt: new Date().toISOString(),
-                  timestamp: Number(Date.now()),
-                  lastSyncTime: null, // Initialize
-                  syncStatus: 'idle', // Initialize
-                };
+                  await encryptAndStoreUserData(user);
+                  await encryptAndStoreToken(latestAccessToken);
+                  
+                  const userId = user.sub;
+                  set({
+                    user,
+                    isAuthenticated: true,
+                    accessToken: latestAccessToken,
+                    storeReady: true,
+                    hasUserId: true,
+                    userId,
+                    hasAccessToken: true
+                  });
 
-                // Save user data
-                await encryptAndStoreUserData(user);
-                
-                const userId = user.sub;
-                set({
-                  user,
-                  isAuthenticated: true,
-                  accessToken,
-                  storeReady: true,
-                  hasUserId: true,
-                  userId,
-                  hasAccessToken: true
-                });
-
-                // Restore data from Drive
-                await get().restoreAndSaveUserData(accessToken, userId);
-                return true;
-              } else {
-                console.log('[useUserStore] Failed to get user info from Google, logging out...');
-                await get().logout();
-                return false;
+                  if (userId) {
+                    await get().restoreAndSaveUserData(latestAccessToken, userId);
+                    await useFavoriteBookmarkStore.getState().syncData(userId, latestAccessToken);
+                  }
+                  return true;
+                }
               }
             } catch (error) {
-              console.error('[useUserStore] Error restoring user data:', error);
-              await get().logout();
-              return false;
+              console.error('[useUserStore] Error fetching user info with valid token:', error);
             }
           }
 
-          // Case 3: Neither user data nor token exists
-          console.log('[useUserStore] No user data or token found, setting unauthenticated state');
-          set({
-            user: null,
-            isAuthenticated: false,
-            accessToken: null,
-            storeReady: true,
-            hasUserId: false,
-            userId: null,
-            hasAccessToken: false
-          });
-          return true;
-
+          // Fallback if no valid token or user data, and fetching user info failed
+          console.log('[useUserStore] No valid token, no user data, or user info fetch failed. Logging out.');
+          await get().logout();
+          set({ storeReady: true }); // Ensure store is marked ready
+          return false;
         } catch (error) {
-          console.error('[useUserStore] Error during initialization:', error);
-          set({
-            user: null,
-            isAuthenticated: false,
-            accessToken: null,
-            storeReady: true,
-            hasUserId: false,
-            userId: null,
-            hasAccessToken: false
-          });
+          console.error('[useUserStore] Critical error during initializeUser:', error);
+          await get().logout();
+          set({ storeReady: true }); // Ensure store is marked ready even on error
           return false;
         }
       },
@@ -319,7 +339,6 @@ const useUserStore = create<UserStore>()(
               console.error('[useUserStore] User ID is null or undefined.');
               return false;
             }
-            const validUserId: string = userId; // Ensure userId is a string
 
             // Prepare data for IndexedDB (UserData type, without isAuthenticated)
             const userDataToSaveDB: UserData = {
@@ -337,7 +356,7 @@ const useUserStore = create<UserStore>()(
               timestamp: Date.now(),
               lastSyncTime: userData.lastSyncTime || null,
               syncStatus: userData.syncStatus || 'idle',
-              updatedAt: userData.updatedAt, // Pass updatedAt if available
+              updatedAt: userData.updatedAt,
             };
 
             console.log('[useUserStore] setUser - saving userData to DB for userId:', userId);
@@ -355,17 +374,20 @@ const useUserStore = create<UserStore>()(
               userId: userId,
               hasUserId: true,
               is2FAEnabled: userForStore.is2FAEnabled,
-              is2FAVerified: userForStore.is2FAEnabled, // Assume verified on login if enabled
+              is2FAVerified: userForStore.is2FAEnabled,
               lastSyncTime: userForStore.lastSyncTime,
               syncStatus: userForStore.syncStatus,
             });
 
-            if (accessToken && typeof accessToken === 'string' && typeof validUserId === 'string') {
-              const definiteAccessToken: string = accessToken!; // Explicitly capture the narrowed type with non-null assertion
-              await encryptAndStoreToken(definiteAccessToken);
-              set({ accessToken: definiteAccessToken, hasAccessToken: true });
-              // Attempt to restore user data from Google Drive
-              await get().restoreAndSaveUserData(definiteAccessToken, validUserId);
+            if (accessToken && typeof accessToken === 'string') {
+              await encryptAndStoreToken(accessToken);
+              set({ accessToken, hasAccessToken: true });
+              
+              // Attempt to restore user data from Google Drive using the correct userId
+              await get().restoreAndSaveUserData(accessToken, userId);
+              
+              // Also sync favorite and bookmark data after user initialization
+              await useFavoriteBookmarkStore.getState().syncData(userId, accessToken);
             }
 
             return true;
@@ -373,7 +395,7 @@ const useUserStore = create<UserStore>()(
             set({ user: null, isAuthenticated: false, userId: null, hasUserId: false });
             if (accessToken && typeof accessToken === 'string') {
               await encryptAndStoreToken(accessToken);
-              set({ accessToken: accessToken, hasAccessToken: true });
+              set({ accessToken, hasAccessToken: true });
             }
             return false;
           }
@@ -643,6 +665,9 @@ const useUserStore = create<UserStore>()(
             temp2FACode: null,
             hasAccessToken: false,
             hasUserId: false,
+            isRestoringData: false,
+            restoreProgress: 0,
+            restoreStatus: '',
           });
           console.log('[useUserStore] All user data cleared successfully.');
         } catch (error) {
@@ -758,6 +783,9 @@ const useUserStore = create<UserStore>()(
             temp2FACode: null,
             hasAccessToken: false,
             hasUserId: false,
+            isRestoringData: false,
+            restoreProgress: 0,
+            restoreStatus: '',
           });
         } catch (error) {
           console.error('[useUserStore] Error during logout:', error);
@@ -770,52 +798,58 @@ const useUserStore = create<UserStore>()(
 
       // New action to restore and save user data
       restoreAndSaveUserData: async (accessToken: string, userId: string) => {
-        set({ syncStatus: 'loading', syncError: null });
+        if (!userId || typeof userId !== 'string' || !accessToken || typeof accessToken !== 'string') {
+          console.error('[useUserStore] Invalid userId or accessToken provided to restoreAndSaveUserData');
+          return false;
+        }
+
         try {
-          const restoredData = await restoreUserData(userId);
-
-          if (restoredData) {
-            console.log('[useUserStore] Restored data from Google Drive:', restoredData);
-
-            // Save restored data to IndexedDB
-            if (Array.isArray(restoredData.readPosts)) {
-              await saveHistoryData('reads', userId, restoredData.readPosts);
-            }
-            if (Array.isArray(restoredData.favoritePosts)) {
-              await saveHistoryData('favorites', userId, restoredData.favoritePosts);
-            }
-            if (Array.isArray(restoredData.mangaBookmarks)) {
-              await saveHistoryData('bookmarks', userId, restoredData.mangaBookmarks);
-            }
+          console.log('[useUserStore] Starting restoreAndSaveUserData with userId:', userId);
+          set({ isRestoringData: true, restoreProgress: 0, restoreStatus: 'Đang kiểm tra dữ liệu...' });
+          
+          // Step 1: Check for backup file
+          set({ restoreProgress: 20, restoreStatus: 'Đang tìm kiếm bản sao lưu...' });
+          const { syncData } = useFavoriteBookmarkStore.getState();
+          
+          // Step 2: Download and process data
+          set({ restoreProgress: 40, restoreStatus: 'Đang tải dữ liệu từ Google Drive...' });
+          const success = await syncData(userId, accessToken);
+          
+          if (success) {
+            // Step 3: Save to local storage
+            set({ restoreProgress: 80, restoreStatus: 'Đang lưu dữ liệu vào bộ nhớ...' });
+            console.log('[useUserStore] Successfully restored and saved data from Google Drive via syncData.');
             
-            // Optionally update user info in store if restored data has relevant fields
-            const currentUser = get().user;
-            if (currentUser) {
-              const updatedUser = {
-                ...currentUser,
-                is2FAEnabled: restoredData.is2FAEnabled !== undefined ? restoredData.is2FAEnabled : currentUser.is2FAEnabled,
-                twoFactorSecret: restoredData.twoFactorSecret !== undefined ? restoredData.twoFactorSecret : currentUser.twoFactorSecret,
-                lastSyncTime: restoredData.timestamp || Date.now(),
-              };
-              set({ user: updatedUser });
-              await saveUserData(userId, updatedUser);
-            }
-
-            set({ lastSyncTime: Date.now(), syncStatus: 'success' });
-            // Call syncUserData to ensure data is pushed to Google Drive after restoration
-            // Create explicitly typed local variables to satisfy linter
-            const syncAccessToken: string = accessToken;
-            const syncUserId: string = userId;
-            await get().syncUserData(syncAccessToken, syncUserId);
+            // Step 4: Complete
+            set({ 
+              restoreProgress: 100, 
+              restoreStatus: 'Hoàn tất khôi phục dữ liệu',
+              isRestoringData: false 
+            });
+            
+            // Reset progress after a delay
+            setTimeout(() => {
+              set({ restoreProgress: 0, restoreStatus: '' });
+            }, 1000);
+            
             return true;
-          } else {
-            console.log('[useUserStore] No data to restore from Google Drive or file not found.');
-            set({ syncStatus: 'idle' });
-            return false;
           }
-        } catch (error: any) {
-          console.error('[useUserStore] Error restoring and saving user data:', error);
-          set({ syncStatus: 'error', syncError: error.message || 'Failed to restore data' });
+          
+          set({ 
+            restoreProgress: 0, 
+            restoreStatus: 'Không tìm thấy dữ liệu để khôi phục',
+            isRestoringData: false 
+          });
+          
+          console.log('[useUserStore] No data restored from Google Drive or syncData failed.');
+          return false;
+        } catch (error) {
+          console.error('[useUserStore] Error in restoreAndSaveUserData:', error);
+          set({ 
+            restoreProgress: 0, 
+            restoreStatus: 'Lỗi khi khôi phục dữ liệu',
+            isRestoringData: false 
+          });
           return false;
         }
       },

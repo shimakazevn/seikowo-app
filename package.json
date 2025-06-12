@@ -57,7 +57,7 @@
   "scripts": {
     "dev": "cross-env NODE_OPTIONS=\"--no-deprecation\" vite",
     "start": "cross-env NODE_OPTIONS=\"--no-deprecation\" vite",
-    "build": "cross-env NODE_OPTIONS=\"--no-deprecation\" vite build",
+    "build": "cross-env NODE_OPTIONS=\"--no-deprecation\" NODE_ENV=production vite build",
     "preview": "cross-env NODE_OPTIONS=\"--no-deprecation\" vite preview",
     "clean": "rimraf dist",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx",

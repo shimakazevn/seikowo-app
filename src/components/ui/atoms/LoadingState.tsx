@@ -42,12 +42,13 @@ interface ListSkeletonProps {
 export const ListSkeleton: React.FC<ListSkeletonProps> = ({ count = 3 }) => {
   return (
     <VStack spacing={4} align="stretch">
-      {Array(count).fill(null).map(_, index: number) => (
+      {Array(count).fill(null).map((_, index: number) => (
         <Box key={index}>
           <Skeleton height="20px" mb={2} />
           <SkeletonText noOfLines={2} spacing={4} />
         </Box>
-      ))} </VStack>
+      ))}
+    </VStack>
   );
 };
 
@@ -63,9 +64,10 @@ export const GridSkeleton: React.FC<GridSkeletonProps> = ({ columns = 3, rows = 
       gridTemplateColumns={`repeat(${columns}, 1fr)`}
       gap={4}
     >
-      {Array(columns * rows).fill(null).map(_, index: number) => (
+      {Array(columns * rows).fill(null).map((_, index: number) => (
         <CardSkeleton key={index} />
-      ))} </Box>
+      ))}
+    </Box>
   );
 };
 

@@ -45,8 +45,8 @@ const PagesList: React.FC = () => {
     <div className="container my-4">
       <h2 className="mb-4">Danh sách Trang Tĩnh</h2>
       <div className="row row-cols-1 row-cols-md-2 g-4">
-        {pages.map((page => {
-          const urlParts = page.url.split('/p/': any));
+        {pages.map((page) => {
+          const urlParts = page.url.split('/p/');
           const slug = urlParts[1]?.replace('.html', '') || '';
           const linkPath = `/p/${slug}.html`;
           const date = new Date(page.published);
@@ -66,13 +66,13 @@ const PagesList: React.FC = () => {
                   )}
                   <div className="card-body d-flex flex-column">
                     <h5 className="card-title">{page.title}</h5>
-                    <small className="text-muted mt-auto">{date.toLocaleDateString())} </small>
+                    <small className="text-muted mt-auto">{date.toLocaleDateString()} </small>
                   </div>
                 </div>
               </Link>
             </div>
           );
-        }))} </div>
+        })} </div>
     </div>
   );
 };

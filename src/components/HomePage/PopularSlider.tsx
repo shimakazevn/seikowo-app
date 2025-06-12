@@ -57,7 +57,7 @@ const PopularSlider: React.FC = () => {
       <h3 className="text-white mb-3">🔥 Bài viết nổi bật</h3>
       <div className="glide__track" data-glide-el="track">
         <ul className="glide__slides">
-          {(loading ? Array(3).fill(null) : posts).map(post, idx: number) => {
+          {(loading ? Array(3).fill(null) : posts).map((post, idx) => {
             if (!post) {
               return (
                 <li key={idx} className="glide__slide">
@@ -95,7 +95,7 @@ const PopularSlider: React.FC = () => {
                         <h5 className="post-title">{post.title}</h5>
                       </Link>
                       <div className="mt-2 d-flex flex-wrap gap-1">
-                        {tags.map(tag: any, i: number: number) => (
+                        {tags.map((tag: string, i: number) => (
                           <Link
                             key={i}
                             to={`/tag/${encodeURIComponent(tag)}`}
@@ -110,7 +110,7 @@ const PopularSlider: React.FC = () => {
                 </div>
               </li>
             );
-          }))} </ul>
+          })} </ul>
       </div>
     </div>
   );

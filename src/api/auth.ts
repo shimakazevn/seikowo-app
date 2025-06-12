@@ -57,6 +57,7 @@ export const handleLogin = async (params: LoginParams): Promise<void> => {
 
     // Get user info using fetchWithAuth
     const userInfo = await getUserInfo(response.access_token);
+    console.log('[handleLogin] User info received after getUserInfo:', userInfo);
     if (!userInfo || !userInfo.sub) {
       throw new Error('Không thể lấy thông tin người dùng');
     }
@@ -96,6 +97,14 @@ export const handleLogin = async (params: LoginParams): Promise<void> => {
     // Initialize or create Drive file
     try {
       console.log('[auth.ts] Checking for existing Drive file...');
+      toast({
+        title: "Đang khôi phục dữ liệu",
+        description: "Đang tải bản sao lưu từ Google Drive...",
+        status: "info",
+        duration: 3000,
+        isClosable: true,
+      });
+
       const fileName = `blogger_data_${userInfo.sub}.json`;
       const file = await findFile(fileName);
       
@@ -109,6 +118,13 @@ export const handleLogin = async (params: LoginParams): Promise<void> => {
         };
         await createFile(fileName, emptyData);
         console.log('[auth.ts] Created new empty file in Drive');
+        toast({
+          title: "Bản sao lưu mới đã được tạo",
+          description: "Không tìm thấy bản sao lưu cũ, đã tạo bản mới trên Google Drive.",
+          status: "info",
+          duration: 3000,
+          isClosable: true,
+        });
       } else {
         console.log('[auth.ts] Found existing file, attempting to restore data...');
         // Try to restore data from Drive
@@ -125,12 +141,27 @@ export const handleLogin = async (params: LoginParams): Promise<void> => {
             await saveHistoryData('bookmarks', userInfo.sub, restoredData.mangaBookmarks);
           }
           console.log('[auth.ts] Successfully restored data from Drive');
+          toast({
+            title: "Khôi phục dữ liệu thành công",
+            description: "Đã khôi phục dữ liệu từ Google Drive.",
+            status: "success",
+            duration: 3000,
+            isClosable: true,
+          });
+        } else {
+          toast({
+            title: "Không tìm thấy bản sao lưu",
+            description: "Không có dữ liệu để khôi phục từ Google Drive.",
+            status: "info",
+            duration: 3000,
+            isClosable: true,
+          });
         }
       }
     } catch (driveError: any) {
       console.error('[auth.ts] Error handling Drive file:', driveError);
       toast({
-        title: "Cảnh báo",
+        title: "Lỗi đồng bộ",
         description: "Không thể đồng bộ với Google Drive. Một số tính năng có thể không hoạt động.",
         status: "warning",
         duration: 5000,
@@ -357,7 +388,9 @@ export const getUserInfo = async (token: string): Promise<any> => {
     if (!response.ok) {
       throw new Error(`Failed to fetch user info: ${response.statusText}`);
     }
-    return await response.json();
+    const data = await response.json();
+    console.log('[getUserInfo] Raw user info data from Google API:', data);
+    return data;
   } catch (error: any) {
     console.error('Error getting user info:', error);
     throw error;
@@ -368,10 +401,12 @@ export const getUserInfo = async (token: string): Promise<any> => {
 export const findFile = async (fileName: string): Promise<any> => {
   try {
     if (fileIdCache.has(fileName)) {
-      return fileIdCache.get(fileName);
+      const cachedFile = fileIdCache.get(fileName);
+      // Return cached file directly if it exists, assuming it's the latest
+      return cachedFile;
     }
 
-    const response = await fetchWithAuth(`https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and trashed=false&spaces=appDataFolder`, {
+    const response = await fetchWithAuth(`https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and trashed=false&spaces=appDataFolder&fields=files(id,name,modifiedTime)`, {
       headers: {
         'Accept': 'application/json'
       }
@@ -382,13 +417,35 @@ export const findFile = async (fileName: string): Promise<any> => {
     }
 
     const data = await response.json();
-    const file = data.files.length > 0 ? data.files[0] : null;
-    if (file) {
-      fileIdCache.set(fileName, file.id);
+    const files = data.files;
+
+    if (files.length === 0) {
+      return null; // No file found
     }
-    return file;
+
+    // Sort files by modifiedTime in descending order to get the latest file
+    files.sort((a: any, b: any) => new Date(b.modifiedTime).getTime() - new Date(a.modifiedTime).getTime());
+
+    const latestFile = files[0];
+
+    // Delete older duplicate files
+    for (let i = 1; i < files.length; i++) {
+      const oldFileId = files[i].id;
+      console.log(`[auth.ts] Deleting old duplicate file: ${files[i].name} (ID: ${oldFileId})`);
+      try {
+        await fetchWithAuth(`https://www.googleapis.com/drive/v3/files/${oldFileId}`, {
+          method: 'DELETE'
+        });
+        console.log(`[auth.ts] Successfully deleted old duplicate file: ${oldFileId}`);
+      } catch (deleteError: any) {
+        console.warn(`[auth.ts] Failed to delete old duplicate file ${oldFileId}:`, deleteError);
+      }
+    }
+
+    fileIdCache.set(fileName, latestFile);
+    return latestFile;
   } catch (error: any) {
-    console.error('Error finding file:', error);
+    console.error('Error finding and cleaning files:', error);
     throw error;
   }
 };
@@ -530,25 +587,13 @@ export const backupUserData = async (userId: string, data: any): Promise<any> =>
     // Create safe mapped data with default empty arrays
     const mappedData = {
       readPosts: Array.isArray(data.readPosts) 
-        ? data.readPosts.map((post: any) => ({
-            At: post?.At || Date.now(),
-            postId: post?.postId || '',
-            thumbnailUrl: post?.thumbnailUrl || ''
-          }))
+        ? data.readPosts
         : [],
       favoritePosts: Array.isArray(data.favoritePosts)
-        ? data.favoritePosts.map((post: any) => ({
-            At: post?.At || Date.now(),
-            postId: post?.postId || '',
-            thumbnailUrl: post?.thumbnailUrl || ''
-          }))
+        ? data.favoritePosts
         : [],
       mangaBookmarks: Array.isArray(data.mangaBookmarks)
-        ? data.mangaBookmarks.map((bookmark: any) => ({
-            At: bookmark?.At || Date.now(),
-            postId: bookmark?.postId || '',
-            thumbnailUrl: bookmark?.thumbnailUrl || ''
-          }))
+        ? data.mangaBookmarks
         : []
     };
 

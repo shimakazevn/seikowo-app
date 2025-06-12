@@ -15,8 +15,8 @@ export const isFollowed = async (post: PostData | { data: PostData }, userId: st
   const realPost = (post as { data: PostData })?.data ? (post as { data: PostData }).data : (post as PostData);
   if (!realPost || !realPost.id) throw new Error('Invalid post data structure');
   try {
-    const followedPosts = userId ? await getHistoryData('follows', userId) : [];
-    return Array.isArray(followedPosts) && followedPosts.some(item: FollowedPost) => item.id === realPost.id);
+    const followedPosts = (userId ? await getHistoryData('follows', userId) : []) as FollowedPost[];
+    return Array.isArray(followedPosts) && followedPosts.some((item: FollowedPost) => item.id === realPost.id);
   } catch (error: any) {
     console.error('Error checking if post is followed:', error);
     throw error;
@@ -29,8 +29,8 @@ export const saveFollow = async (post: PostData | { data: PostData }, userId: st
   const realPost = (post as { data: PostData })?.data ? (post as { data: PostData }).data : (post as PostData);
   if (!realPost || !realPost.id) throw new Error('Invalid post data structure');
   try {
-    const followedPosts = userId ? await getHistoryData('favorites', userId) : [];
-    const filteredPosts: any[] = Array.isArray(followedPosts) ? followedPosts.filter(item: FollowedPost) => item.id !== realPost.id) : [];
+    const followedPosts = (userId ? await getHistoryData('favorites', userId) : []) as FollowedPost[];
+    const filteredPosts: FollowedPost[] = Array.isArray(followedPosts) ? followedPosts.filter((item: FollowedPost) => item.id !== realPost.id) : [];
     const thumbnail = realPost.thumbnail || (realPost.content ? extractImage(realPost.content) : null);
     const newFollow: FollowedPost = {
       id: realPost.id,
@@ -57,9 +57,9 @@ export const removeFollow = async (post: PostData | { data: PostData }, userId: 
   const realPost = (post as { data: PostData })?.data ? (post as { data: PostData }).data : (post as PostData);
   if (!realPost || !realPost.id) throw new Error('Invalid post data structure');
   try {
-    const followedPosts = userId ? await getHistoryData('favorites', userId) : [];
+    const followedPosts = (userId ? await getHistoryData('favorites', userId) : []) as FollowedPost[];
     if (!Array.isArray(followedPosts)) return true;
-    const updatedPosts = followedPosts.filter(item: FollowedPost) => item.id !== realPost.id);
+    const updatedPosts = followedPosts.filter((item: FollowedPost) => item.id !== realPost.id);
     userId ? await saveHistoryData('favorites', userId, updatedPosts) : Promise.resolve();
     return true;
   } catch (error: any) {

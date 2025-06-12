@@ -22,7 +22,7 @@ const Page: React.FC = () => {
     const loadPage = async () => {
       try {
         const data = await fetchPages() as PageResponse;
-        const found = data.items?.find(p) => {
+        const found = data.items?.find((p: PageData) => {
           const pageSlug = p.url.split('/').pop();
           return pageSlug === slug;
         });
@@ -38,7 +38,7 @@ const Page: React.FC = () => {
   if (!page) {
     return (
       <div className="container py-5">
-        <h3>Trang không tồn tại.</h3>
+        <h3>Trang không tồn existence.</h3>
         <Link to="/" className="btn btn-secondary mt-3">← Quay lại trang chủ</Link>
       </div>
     );
@@ -48,7 +48,7 @@ const Page: React.FC = () => {
     <div className="container py-4">
       <h2>{page.title}</h2>
       <div className="text-muted mb-3">
-        {new Date(page.published).toLocaleDateString())} </div>
+        {new Date(page.published).toLocaleDateString()} </div>
       <div dangerouslySetInnerHTML={{ __html: page.content }} />
       <Link to="/" className="btn btn-outline-primary mt-4">← Quay lại</Link>
     </div>

@@ -60,15 +60,15 @@ export const SEO: React.FC<SEOProps> = ({
         <>
           {publishedTime && (
             <meta property="article:published_time" content={publishedTime} />
-          ))}
+          )}
           {modifiedTime && (
             <meta property="article:modified_time" content={modifiedTime} />
-          ))}
-          {tags.map(tag, index: number) => (
+          )}
+          {tags.map((tag: string, index: number) => (
             <meta key={index} property="article:tag" content={tag} />
           ))}
         </>
-      ))}
+      )}
       {/* Canonical URL */}
       <link rel="canonical" href={url || siteUrl} />
     </Helmet>

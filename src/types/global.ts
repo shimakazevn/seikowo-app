@@ -67,6 +67,18 @@ export interface MangaBookmark {
   verticalMode?: boolean;
 }
 
+export interface FollowedPost {
+  id: string;
+  title: string;
+  url: string;
+  published: string;
+  updated: string;
+  labels: string[];
+  thumbnail?: string | null;
+  timestamp?: number;
+  followAt: number;
+}
+
 export interface HistoryItem extends Post {
   timestamp: number;
 }

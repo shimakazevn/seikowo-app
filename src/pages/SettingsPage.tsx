@@ -57,6 +57,7 @@ import {
 // import { useAuthContext } from '../contexts/AuthContext'; // REMOVED - causing useAuth spam
 import useUserStore from '../store/useUserStore';
 import { adminConfig } from '../config';
+import { deleteUserData } from '../api/auth'; // Import deleteUserData from auth API
 
 // Import settings components
 import ProfileSettingsTab from '../components/Settings/Profile/ProfileSettingsTab';
@@ -86,6 +87,7 @@ const ProfileSettings = () => {
   // Modal states
   const { isOpen: isLogoutOpen, onOpen: onLogoutOpen, onClose: onLogoutClose } = useDisclosure();
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
+  const { isOpen: isDeleteDriveBackupOpen, onOpen: onDeleteDriveBackupOpen, onClose: onDeleteDriveBackupClose } = useDisclosure(); // New modal state
 
   const toast = useToast();
 
@@ -98,8 +100,6 @@ const ProfileSettings = () => {
   const handleAvatarError = () => {
     if (avatarLoadAttempts < MAX_AVATAR_LOAD_ATTEMPTS) {
       setAvatarLoadAttempts(prev => prev + 1);
-      const timestamp = Date.now();
-      setAvatarUrl(`${user?.picture}?t=${timestamp}`);
     } else {
       setAvatarUrl('');
     }
@@ -224,6 +224,41 @@ const ProfileSettings = () => {
     }
   };
 
+  // Handle delete Drive backup
+  const handleDeleteDriveBackup = async () => {
+    if (!user?.id) {
+      toast({
+        title: 'Lỗi',
+        description: 'Không tìm thấy ID người dùng để xóa bản sao lưu',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    try {
+      await deleteUserData(user.id); // Call deleteUserData from auth API
+      onDeleteDriveBackupClose();
+      toast({
+        title: 'Xóa bản sao lưu thành công',
+        description: 'Bản sao lưu trên Google Drive đã được xóa.',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error deleting Drive backup:', error);
+      toast({
+        title: 'Lỗi xóa bản sao lưu',
+        description: error instanceof Error ? error.message : 'Có lỗi xảy ra khi xóa bản sao lưu trên Google Drive',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
   // Initialize avatar and stats
   useEffect(() => {
     if (user?.picture && !avatarUrl) {
@@ -245,6 +280,7 @@ const ProfileSettings = () => {
         handleExportData={handleExportData}
         onLogoutOpen={onLogoutOpen}
         onDeleteOpen={onDeleteOpen}
+        onDeleteDriveBackupOpen={onDeleteDriveBackupOpen} // Pass the new open handler
       />
 
       {/* Logout Modal */}
@@ -301,6 +337,30 @@ const ProfileSettings = () => {
             <Button colorScheme="red" onClick={handleDeleteData}>
               Xóa dữ liệu
             </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Delete Drive Backup Modal */}
+      <Modal isOpen={isDeleteDriveBackupOpen} onClose={onDeleteDriveBackupClose} isCentered>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Xác nhận xóa bản sao lưu trên Drive</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <Alert status="warning" rounded="md">
+              <AlertIcon />
+              <Box>
+                <AlertTitle>Bạn có chắc chắn?</AlertTitle>
+                <AlertDescription fontSize="sm">
+                  Thao tác này sẽ xóa vĩnh viễn bản sao lưu dữ liệu của bạn khỏi Google Drive. Bạn sẽ không thể khôi phục dữ liệu này từ Drive sau khi xóa.
+                </AlertDescription>
+              </Box>
+            </Alert>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" onClick={onDeleteDriveBackupClose}>Hủy</Button>
+            <Button colorScheme="red" onClick={handleDeleteDriveBackup} ml={3}>Xóa</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

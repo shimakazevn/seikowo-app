@@ -5,15 +5,22 @@ import {
   VStack,
   Text,
   useColorMode,
-  Center
+  Center,
+  useToast
 } from '@chakra-ui/react';
 import { LoginButton } from '../components/features/Auth/LoginButton';
+import useUserStore from '../store/useUserStore';
+import useFavoriteBookmarkStore from '../store/useFollowBookmarkStore';
 
 const LoginPage: React.FC = () => {
   const { colorMode } = useColorMode();
   const isDark = colorMode === 'dark';
   const textColor = isDark ? '#ffffff' : '#000000';
   const mutedColor = isDark ? '#888' : '#666';
+  const toast = useToast();
+
+  const { user, accessToken } = useUserStore();
+  const { syncData } = useFavoriteBookmarkStore();
 
   return (
     <Box
@@ -46,11 +53,33 @@ const LoginPage: React.FC = () => {
               variant="google"
               size="md"
               useGoogleIcon={true}
-              onSuccess={() => {
+              onSuccess={async () => {
                 console.log('Login successful');
+                if (user && user.id && accessToken) {
+                  try {
+                    await syncData(user.id, accessToken, toast);
+                    console.log('User data synced from Drive to IndexedDB.');
+                  } catch (error) {
+                    console.error('Error syncing data from Drive:', error);
+                    toast({
+                      title: 'Lỗi đồng bộ dữ liệu',
+                      description: 'Không thể đồng bộ dữ liệu từ Google Drive.',
+                      status: 'error',
+                      duration: 5000,
+                      isClosable: true,
+                    });
+                  }
+                }
               }}
               onError={(error) => {
                 console.error('Login error:', error);
+                toast({
+                  title: 'Lỗi đăng nhập',
+                  description: 'Đăng nhập không thành công. Vui lòng thử lại.',
+                  status: 'error',
+                  duration: 5000,
+                  isClosable: true,
+                });
               }}
             />
 

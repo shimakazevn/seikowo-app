@@ -12,8 +12,12 @@ import LoginNotificationProvider from './components/features/Auth/LoginNotificat
 import Nav from './components/layout/Nav';
 import Footer from './components/layout/Footer';
 import { ChakraProvider, CSSReset, ColorModeScript } from '@chakra-ui/react';
+import RestoreDataModal from './components/Modals/RestoreDataModal';
+import useUserStore from './store/useUserStore';
 
 function App() {
+  const { isRestoringData, restoreProgress, restoreStatus } = useUserStore();
+
   return (
     <>
       <ColorModeScript initialColorMode={theme.config.initialColorMode} />
@@ -35,6 +39,11 @@ function App() {
               </AuthErrorBoundary>
             </Router>
           </ThemeProvider>
+          <RestoreDataModal
+            isOpen={isRestoringData}
+            progress={restoreProgress}
+            status={restoreStatus}
+          />
         </ChakraProvider>
       </GoogleOAuthProvider>
     </>

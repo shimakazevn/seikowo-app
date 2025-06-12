@@ -28,13 +28,13 @@ import {
   MdVisibility,
   MdVisibilityOff
 } from 'react-icons/md';
-import { UserData } from '../../../services/authService';
+import { User } from '../../../types';
 import { useAuth } from '../../../hooks/useAuthNew';
 import LoginButton from '../../features/Auth/LoginButton';
 
 interface ProfileSettingsTabProps {
   isAuthenticated: boolean;
-  userInfo: UserData | null;
+  userInfo: User | null;
   avatarUrl: string;
   handleAvatarError: () => void;
   isSyncing: boolean;
@@ -42,6 +42,7 @@ interface ProfileSettingsTabProps {
   handleExportData: () => void;
   onLogoutOpen: () => void;
   onDeleteOpen: () => void;
+  onDeleteDriveBackupOpen: () => void;
 }
 
 const ProfileSettingsTab: React.FC<ProfileSettingsTabProps> = ({
@@ -54,6 +55,7 @@ const ProfileSettingsTab: React.FC<ProfileSettingsTabProps> = ({
   handleExportData,
   onLogoutOpen,
   onDeleteOpen,
+  onDeleteDriveBackupOpen
 }) => {
   // Local state
   const [showEmail, setShowEmail] = useState(false);
@@ -250,33 +252,43 @@ const ProfileSettingsTab: React.FC<ProfileSettingsTabProps> = ({
               quản lý dữ liệu
             </Heading>
 
-            <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={3}>
+            <VStack spacing={4} align="stretch">
               <Button
                 leftIcon={<MdRefresh />}
+                colorScheme="blue"
+                variant="outline"
                 onClick={handleSyncData}
                 isLoading={isSyncing}
-                loadingText="đang đồng bộ..."
-                colorScheme="blue"
-                variant="ghost"
-                size="sm"
-                justifyContent="flex-start"
-                fontWeight="500"
               >
-                đồng bộ
+                đồng bộ dữ liệu
               </Button>
-
               <Button
                 leftIcon={<MdDownload />}
-                onClick={handleExportData}
                 colorScheme="green"
-                variant="ghost"
-                size="sm"
-                justifyContent="flex-start"
-                fontWeight="500"
+                variant="outline"
+                onClick={handleExportData}
               >
-                xuất dữ liệu
+                xuất dữ liệu cục bộ
               </Button>
-            </SimpleGrid>
+              <Button
+                leftIcon={<MdDelete />}
+                colorScheme="red"
+                variant="outline"
+                onClick={onDeleteOpen}
+              >
+                xóa dữ liệu cục bộ
+              </Button>
+              {isAuthenticated && (
+                <Button
+                  leftIcon={<MdDelete />}
+                  colorScheme="red"
+                  variant="outline"
+                  onClick={onDeleteDriveBackupOpen}
+                >
+                  xóa bản sao lưu trên drive
+                </Button>
+              )}
+            </VStack>
           </Box>
 
           <Divider />
@@ -437,6 +449,16 @@ const ProfileSettingsTab: React.FC<ProfileSettingsTabProps> = ({
                 >
                   xóa dữ liệu
                 </Button>
+                {isAuthenticated && (
+                  <Button
+                    leftIcon={<MdDelete />}
+                    colorScheme="red"
+                    variant="outline"
+                    onClick={onDeleteDriveBackupOpen}
+                  >
+                    xóa bản sao lưu trên drive
+                  </Button>
+                )}
               </HStack>
             </VStack>
           </HStack>

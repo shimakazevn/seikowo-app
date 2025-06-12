@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Container,
@@ -34,6 +34,7 @@ import {
   FaDownload,
 } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
+import { Post } from '../../types';
 
 import useUserStore from '../../store/useUserStore';
 import useFavoriteBookmarkStore from '../../store/useFollowBookmarkStore';
@@ -87,7 +88,15 @@ const EnhancedMangaPostPage: React.FC<EnhancedMangaPostPageProps> = ({
     initialize: initializeStore
   } = useFavoriteBookmarkStore();
 
+  // State to track favorite status
+  const [isCurrentlyFavorited, setIsCurrentlyFavorited] = useState(false);
 
+  // Effect to update isCurrentlyFavorited when store or postId changes
+  useEffect(() => {
+    if (storeReady && postId) {
+      setIsCurrentlyFavorited(storeIsFavorited(postId));
+    }
+  }, [storeIsFavorited, postId, storeReady]);
 
   // Local state
   const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
@@ -151,26 +160,31 @@ const EnhancedMangaPostPage: React.FC<EnhancedMangaPostPageProps> = ({
     setIsFavoriteLoading(true);
 
     try {
-      const postData = {
+      const postData: Post = {
         id: postId,
-        title,
-        url,
-        labels: tags,
+        title: title,
+        url: url,
         published: publishedDate,
-        content: '' // Add required fields for Post interface
+        updated: publishedDate,
+        labels: tags,
+        thumbnail: coverImage,
+        content: '',
+        slug: '',
       };
 
       console.log('Calling storeToggleFollow with:', {
         postData,
         userId,
         hasAccessToken: !!accessToken,
-        currentlyFavorited: storeIsFavorited(postId)
+        currentlyFavorited: isCurrentlyFavorited
       });
 
       // Store already handles toast notifications, so we don't need to show additional ones
       const result = await storeToggleFavorite(postData, userId || '', accessToken || '');
 
       console.log('storeToggleFavorite result:', result);
+      // Update local state based on the result of the toggle operation
+      setIsCurrentlyFavorited(result);
     } catch (error: any) {
       console.error('Favorite error:', error);
       toast({
@@ -406,8 +420,8 @@ const EnhancedMangaPostPage: React.FC<EnhancedMangaPostPageProps> = ({
                 <HStack spacing={2} w="100%">
                   <Button
                     leftIcon={<FaHeart />}
-                    variant={storeIsFavorited(postId) ? "solid" : "outline"}
-                    colorScheme="red"
+                    variant={isCurrentlyFavorited ? "solid" : "outline"}
+                    colorScheme={isCurrentlyFavorited ? "pink" : "gray"}
                     onClick={handleFavorite}
                     isLoading={isFavoriteLoading}
                     flex={1}
@@ -417,7 +431,7 @@ const EnhancedMangaPostPage: React.FC<EnhancedMangaPostPageProps> = ({
                     minW="0"
                     px={2}
                   >
-                    Favorite
+                    {isCurrentlyFavorited ? 'Favorited' : 'Favorite'}
                   </Button>
 
                   <Button
@@ -577,15 +591,15 @@ const EnhancedMangaPostPage: React.FC<EnhancedMangaPostPageProps> = ({
               <HStack spacing={2} w="100%">
                 <Button
                   leftIcon={<FaHeart />}
-                  variant={storeIsFavorited(postId) ? "solid" : "outline"}
-                  colorScheme="red"
+                  variant={isCurrentlyFavorited ? "solid" : "outline"}
+                  colorScheme={isCurrentlyFavorited ? "pink" : "gray"}
                   onClick={handleFavorite}
                   isLoading={isFavoriteLoading}
                   flex={1}
                   size="md"
                   fontSize="sm"
                 >
-                  Favorite
+                  {isCurrentlyFavorited ? 'Favorited' : 'Favorite'}
                 </Button>
 
                 <Button

@@ -1,6 +1,6 @@
 import { blogConfig } from './config';
 import { getCachedData, setCachedData, CACHE_KEYS } from './utils/cache';
-import { ErrorTypes, AppError, handleError } from './utils/errorHandler'; // Assuming errorHandler is now TS
+import { ErrorTypes, AppError, handleError } from './utils/errorHandler';
 import { DEFAULT_API_CONFIG } from './utils/apiUtils';
 import useUserStore from './store/useUserStore'; // Import useUserStore
 

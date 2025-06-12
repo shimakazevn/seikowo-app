@@ -50,7 +50,13 @@ export const useAuth = () => {
           email: response.email,
           email_verified: response.email_verified,
           id: response.sub,
-          updatedAt: Date.now()
+          updatedAt: new Date().toISOString(),
+          is2FAEnabled: false,
+          twoFactorSecret: null,
+          isAuthenticated: true,
+          timestamp: Date.now(),
+          lastSyncTime: null,
+          syncStatus: 'idle',
         };
       } else {
         // Nếu không có token, thực hiện đăng nhập Google mới
@@ -128,11 +134,6 @@ export const useAuth = () => {
         isAuthenticated: storeIsAuthenticated,
         isLoading: false, // Set isLoading to false once store is ready, regardless of authentication status
       }));
-      // Trigger syncUserData after authentication and store is ready
-      // This ensures data is synchronized upon successful login or session restoration
-      if (storeIsAuthenticated && storeAccessToken && storeUserId) {
-        useUserStore.getState().syncUserData(storeAccessToken, storeUserId);
-      }
     }
   }, [storeUser, storeIsAuthenticated, storeReady, storeAccessToken, storeUserId]);
 

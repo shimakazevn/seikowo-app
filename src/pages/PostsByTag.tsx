@@ -55,8 +55,8 @@ const PostsByTag: React.FC = () => {
     <div className="container">
       <h2 className="mb-4">Thể loại: <span className="text-primary">{label}</span></h2>
       <div className="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-4">
-        {posts.map((post => {
-          const slugPath = getSlugFromUrl(post.url: any));
+        {posts.map((post) => {
+          const slugPath = getSlugFromUrl(post.url);
           const date = new Date(post.published);
           const thumb = getThumbnail(post);
 
@@ -67,13 +67,13 @@ const PostsByTag: React.FC = () => {
                   <img src={thumb} className="card-img-top" alt={post.title} style={{ height: 300, objectFit: 'cover' }} />
                   <div className="card-body">
                     <h5 className="card-title text-truncate">{post.title}</h5>
-                    <p className="card-text"><small className="text-muted">{date.toLocaleDateString())} </small></p>
+                    <p className="card-text"><small className="text-muted">{date.toLocaleDateString()} </small></p>
                   </div>
                 </div>
               </Link>
             </div>
           );
-        }))} </div>
+        })} </div>
     </div>
   );
 };

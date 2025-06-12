@@ -5,7 +5,7 @@ declare module 'react-virtualized' {
     width: number;
     height: number;
     rowCount: number;
-    rowHeight: number | (params: { index: number }) => number);
+    rowHeight: number | ((params: { index: number }) => number);
     rowRenderer: (params: {
       index: number;
       key: string;

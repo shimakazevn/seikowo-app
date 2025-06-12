@@ -152,6 +152,24 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
   const toast = useToast();
   const { colorMode } = useColorMode();
 
+  // Thêm state để theo dõi polling (đã được phục hồi)
+  const [isPolling, setIsPolling] = useState(false);
+  const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup function (đã được phục hồi)
+  const cleanupPolling = () => {
+    if (pollingTimeoutRef.current) {
+      clearTimeout(pollingTimeoutRef.current);
+      pollingTimeoutRef.current = null;
+    }
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    setIsPolling(false);
+  };
+
   // Clean theme colors
   const bgColor = isDark ? '#131313' : '#f4f4f4';
 
@@ -734,30 +752,14 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
     }
   };
 
-  // Thêm state để theo dõi polling
-  const [isPolling, setIsPolling] = useState(false);
-  const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Cleanup function
-  const cleanupPolling = () => {
-    if (pollingTimeoutRef.current) {
-      clearTimeout(pollingTimeoutRef.current);
-      pollingTimeoutRef.current = null;
-    }
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
-    }
-    setIsPolling(false);
-  };
-
   // Sửa lại handleIframeLoad
   const handleIframeLoad = () => {
-    console.log('🔄 Iframe loaded, setting up comment detection...');
+    console.log('🔄 Iframe loaded, applying dark mode.');
     applyIframeDarkMode();
 
-    // Check for comment success in current URL
+    // The current URL in the main window (not the iframe's) might contain
+    // indications of a newly posted comment (e.g., #c...). This part is useful
+    // for handling comments posted via the external link.
     const checkCurrentUrlForComment = () => {
       const currentUrl = window.location.href;
       const urlParams = new URLSearchParams(window.location.search);
@@ -783,73 +785,12 @@ const BloggerCommentSection: React.FC<BloggerCommentSectionProps> = ({
           waitAndScrollToComment();
         }
 
+        // Clean the URL to remove comment-related parameters/hash
         const cleanUrl = window.location.pathname;
         window.history.replaceState({}, '', cleanUrl);
       }
     };
-
-    // Start polling for new comments with timeout
-    const startCommentPolling = () => {
-      if (isPolling || isLoading) {
-        console.log('⏹️ Polling or loading in progress, skipping...');
-        return;
-      }
-
-      console.log('🎯 Starting comment polling...');
-      setIsPolling(true);
-
-      pollingIntervalRef.current = setInterval(async () => {
-        if (!isLoading) {
-          console.log('🔄 Polling for new comments...');
-          await fetchComments(true);
-        }
-      }, FETCH_COOLDOWN);
-
-      pollingTimeoutRef.current = setTimeout(() => {
-        console.log('⏹️ Stopping comment polling after timeout');
-        cleanupPolling();
-      }, 30000);
-
-      return pollingIntervalRef.current;
-    };
-
-    // Check current URL immediately
-    checkCurrentUrlForComment();
-
-    // Method 1: Listen for iframe URL changes
-    let lastUrl = '';
-    const checkUrlChange = () => {
-      try {
-        const iframe = iframeRef.current;
-        if (iframe?.contentWindow) {
-          const currentUrl = iframe.contentWindow.location.href;
-          if (currentUrl !== lastUrl && (currentUrl.includes('#c') || currentUrl.includes('comment'))) {
-            console.log('🎯 Comment URL detected, starting polling...');
-            startCommentPolling();
-          }
-          lastUrl = currentUrl;
-        }
-      } catch (error) {
-        // CORS will block this, but worth trying
-      }
-    };
-
-    // Method 2: Listen for window focus
-    const handleWindowFocus = () => {
-      if (!isPolling && !isLoading) {
-        console.log('👁️ Window focused, checking for new comments...');
-        fetchComments(true);
-      }
-    };
-
-    const urlCheckInterval = setInterval(checkUrlChange, 1000);
-    window.addEventListener('focus', handleWindowFocus);
-
-    return () => {
-      clearInterval(urlCheckInterval);
-      window.removeEventListener('focus', handleWindowFocus);
-      cleanupPolling();
-    };
+    checkCurrentUrlForComment(); // Call once on load
   };
 
   // Scroll to comment form
