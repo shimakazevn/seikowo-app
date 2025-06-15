@@ -22,6 +22,7 @@ interface FavoriteBookmarkStore {
   bookmarks: MangaBookmark[];
   loading: boolean;
   error: string | null;
+  storeReady: boolean;
   initialize: (userId: string) => Promise<void>;
   toggleFavorite: (post: Post, userId: string, accessToken: string | null, toast?: ToastFunction) => Promise<boolean>;
   removeFavorite: (postId: string, userId: string, toast?: ToastFunction) => Promise<boolean>;
@@ -39,12 +40,13 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>((set, get) => ({
   bookmarks: [],
   loading: false,
   error: null,
+  storeReady: false,
 
   // Actions
   initialize: async (userId: string): Promise<void> => {
     if (!userId) return;
 
-    set({ loading: true, error: null });
+    set({ loading: true, error: null, storeReady: false });
     try {
       const [favoritesRaw, bookmarksRaw] = await Promise.all([
         getHistoryData('favorites', userId),
@@ -57,12 +59,13 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>((set, get) => ({
       set({
         favorites: (Array.isArray(favorites) ? favorites : []) as FavoritePost[],
         bookmarks: (Array.isArray(bookmarks) ? bookmarks : []) as MangaBookmark[],
-        loading: false
+        loading: false,
+        storeReady: true
       });
       console.log('[useFavoriteBookmarkStore] Favorites after initialization:', get().favorites);
     } catch (error: any) {
       console.error('Error initializing favorite/bookmark store:', error);
-      set({ error: 'Failed to load data', loading: false });
+      set({ error: 'Failed to load data', loading: false, storeReady: true });
     }
   },
 
@@ -291,7 +294,6 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>((set, get) => ({
       return false;
     }
 
-    set({ loading: true, error: null });
     try {
       const [localFavoritesRaw, localBookmarksRaw, localReadsRaw] = await Promise.all([
         getHistoryData('favorites', userId),
@@ -370,7 +372,6 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>((set, get) => ({
       set({
         favorites: mergedFavorites,
         bookmarks: mergedBookmarks,
-        loading: false
       });
 
       // Always backup to Google Drive after merge (this is the key change for the new flow)

@@ -12,6 +12,7 @@ import {
   Box,
   Heading,
 } from '@chakra-ui/react';
+import { AppModal } from '../common/AppModal';
 
 interface RestoreDataModalProps {
   isOpen: boolean;
@@ -24,45 +25,32 @@ const RestoreDataModal: React.FC<RestoreDataModalProps> = ({ isOpen, progress, s
   const textColor = useColorModeValue('gray.600', 'gray.300');
 
   return (
-    <Modal isOpen={isOpen} onClose={() => {}} closeOnOverlayClick={false} isCentered>
-      <ModalOverlay backdropFilter="blur(12px) saturate(180%)" bg="blackAlpha.400" />
-      <ModalContent
-        bg={bgColor}
-        maxW={{ base: "90%", md: "500px" }}
-        minH="280px"
-        mx={4}
-        borderRadius="2xl"
-        boxShadow="0 4px 30px rgba(0, 0, 0, 0.2)"
-        border="1px solid rgba(255, 255, 255, 0.1)"
-        position="relative"
-        overflow="hidden"
-      >
-        <ModalBody p={8}>
-          <VStack spacing={6} align="center" py={8}>
-            <Spinner size="xl" color="blue.500" thickness="4px" />
-            <Heading size="md" textAlign="center" color={textColor}>
-              Đang khôi phục dữ liệu
-            </Heading>
-            <Text color={textColor} textAlign="center">
-              {status}
+    <AppModal isOpen={isOpen} onClose={() => {}} closeOnOverlayClick={false} isCentered>
+      <ModalBody p={8}>
+        <VStack spacing={6} align="center" py={8}>
+          <Spinner size="xl" color="blue.500" thickness="4px" />
+          <Heading size="md" textAlign="center">
+            Đang khôi phục dữ liệu
+          </Heading>
+          <Text textAlign="center">
+            {status}
+          </Text>
+          <Box w="full" px={4}>
+            <Progress
+              value={progress}
+              size="md"
+              colorScheme="blue"
+              borderRadius="full"
+              hasStripe
+              isAnimated
+            />
+            <Text mt={2} textAlign="center" fontSize="sm">
+              {progress}%
             </Text>
-            <Box w="full" px={4}>
-              <Progress
-                value={progress}
-                size="md"
-                colorScheme="blue"
-                borderRadius="full"
-                hasStripe
-                isAnimated
-              />
-              <Text mt={2} textAlign="center" fontSize="sm" color={textColor}>
-                {progress}%
-              </Text>
-            </Box>
-          </VStack>
-        </ModalBody>
-      </ModalContent>
-    </Modal>
+          </Box>
+        </VStack>
+      </ModalBody>
+    </AppModal>
   );
 };
 

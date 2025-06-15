@@ -2,6 +2,7 @@ import { getSlugFromUrl, extractImage, Post } from './blogUtils';
 import { getHistoryData, saveHistoryData, openDatabase, getDataFromDB, saveDataToDB, withTransaction } from './indexedDBUtils';
 import { getUserInfo } from './userUtils';
 import type { FavoritePost, MangaBookmark } from '../types/global';
+import { clearCachedData, CACHE_KEYS } from './cache';
 
 // Interfaces
 export interface PostData {
@@ -144,14 +145,11 @@ export const saveMangaBookmark = async (bookmark: MangaBookmark): Promise<boolea
 // Clear post cache
 export const clearPostCache = async (): Promise<void> => {
   try {
-    const db = await openDatabase();
-    const transaction = db.transaction(['cache'], 'readwrite');
-    const objectStore = transaction.objectStore('cache');
-    objectStore.clear();
-    return new Promise((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = (event) => reject((event.target as IDBRequest).error);
-    });
+    console.log('[postUtils] Clearing specific post caches...');
+    await clearCachedData(CACHE_KEYS.ATOM_POSTS);
+    await clearCachedData(`${CACHE_KEYS.ATOM_POSTS}_progressive`);
+    // Add other post-related cache keys if necessary
+    console.log('[postUtils] Post caches cleared.');
   } catch (error) {
     console.error('Error clearing post cache:', error);
     throw error;

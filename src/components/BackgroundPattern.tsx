@@ -25,12 +25,12 @@ interface BackgroundPatternProps {
 }
 
 const BackgroundPattern: React.FC<BackgroundPatternProps> = memo(({
-  variant = 'geometric',
-  opacity = 0.1
+  variant = 'dots',
+  opacity = 0.05
 }) => {
-  const patternColor = useColorModeValue('blue.200', 'blue.600');
-  const accentColor = useColorModeValue('purple.200', 'purple.600');
-  const tertiaryColor = useColorModeValue('pink.200', 'pink.600');
+  const patternColor = useColorModeValue('gray.200', 'gray.700');
+  const accentColor = useColorModeValue('gray.200', 'gray.700');
+  const tertiaryColor = useColorModeValue('gray.200', 'gray.700');
 
   if (variant === 'dots') {
     return (

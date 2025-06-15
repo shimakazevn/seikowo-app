@@ -28,6 +28,9 @@ import { getHistoryData, saveHistoryData, getUserData } from '../../utils/indexe
 import { FOLLOW_KEY, MANGA_KEY } from '../../utils/userUtils';
 import useUserStore from '../../store/useUserStore';
 import { useToast } from '@chakra-ui/react';
+import { AppModal } from '../common/AppModal';
+import { BackupSection } from '../Settings/BackupSection';
+import { ClearDataSection } from '../Settings/ClearDataSection';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -166,7 +169,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
 
   return (
     <>
-      <Modal
+      <AppModal
         isOpen={isOpen}
         onClose={onClose}
         size="xl"
@@ -175,140 +178,61 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         blockScrollOnMount={true}
         preserveScrollBarGap={false}
       >
-        <ModalOverlay backdropFilter="blur(10px)" />
-        <ModalContent
-          backdropFilter="blur(30px)"
-          bg={useColorModeValue("rgba(255, 255, 255, 0.48)", "rgba(26, 32, 44, 0.48)")}
-          borderRadius="xl"
-          boxShadow="xl"
-          maxW="800px"
-          mx={4}
-          maxH="80vh"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <ModalHeader>Cài đặt</ModalHeader>
-          <ModalCloseButton />
-          <Divider />
-          <ModalBody>
-            <VStack spacing={8} align="stretch">
-              {/* Data Management Section */}
-              <Box>
-                <Heading size="md" mb={4}>Quản lý dữ liệu</Heading>
+        <ModalHeader>Cài đặt</ModalHeader>
+        <ModalCloseButton />
+        <Divider />
+        <ModalBody>
+          <VStack spacing={8} align="stretch">
+            <Box>
+              <Heading size="md" mb={4}>Quản lý dữ liệu</Heading>
+              <VStack spacing={4} align="stretch">
+                <BackupSection 
+                  onBackup={syncWithDrive}
+                  isLoading={restoring}
+                />
+                <ClearDataSection onClearData={onConfirmOpen} />
+              </VStack>
+            </Box>
+          </VStack>
+        </ModalBody>
+      </AppModal>
 
-                <VStack spacing={4} align="stretch">
-                  {/* Backup Section */}
-                  <Box
-                    p={4}
-                    borderWidth="1px"
-                    borderRadius="lg"
-                    borderColor="gray.200"
-                    bg={useColorModeValue("rgba(255, 255, 255, 0.48)", "rgba(26, 32, 44, 0.48)")}
-                    _hover={{ bg: useColorModeValue("rgba(255,255,255,0.68)", "rgba(26,32,44,0.68)") }}
-                  >
-                    <VStack align="stretch" spacing={3}>
-                      <HStack justify="space-between">
-                        <Box>
-                          <Text fontWeight="medium" color={textColor}>Sao lưu dữ liệu</Text>
-                          <Text fontSize="sm" color={mutedTextColor}>
-                            Sao lưu dữ liệu bookmark lên Google Drive
-                          </Text>
-                        </Box>
-                        <Button
-                          colorScheme="green"
-                          onClick={syncWithDrive}
-                          isLoading={restoring}
-                          loadingText="Đang backup..."
-                          leftIcon={<DownloadIcon />}
-                          variant="solid"
-                          size="md"
-                        >
-                          Backup
-                        </Button>
-                      </HStack>
-                    </VStack>
-                  </Box>
-
-                  {/* Clear Data Section */}
-                  <Box
-                    p={4}
-                    borderWidth="1px"
-                    borderRadius="lg"
-                    borderColor="gray.200"
-                    bg={useColorModeValue("rgba(255, 255, 255, 0.48)", "rgba(26, 32, 44, 0.48)")}
-                    _hover={{ bg: useColorModeValue("rgba(255,255,255,0.68)", "rgba(26,32,44,0.68)") }}
-                  >
-                    <VStack align="stretch" spacing={3}>
-                      <HStack justify="space-between">
-                        <Box>
-                          <Text fontWeight="medium" color={textColor}>Xóa dữ liệu</Text>
-                          <Text fontSize="sm" color={mutedTextColor}>
-                            Xóa toàn bộ dữ liệu bookmark trên Drive và local
-                          </Text>
-                        </Box>
-                        <Button
-                          colorScheme="red"
-                          onClick={onConfirmOpen}
-                          leftIcon={<DeleteIcon />}
-                          variant="solid"
-                          size="md"
-                        >
-                          Xóa dữ liệu
-                        </Button>
-                      </HStack>
-                    </VStack>
-                  </Box>
-                </VStack>
-              </Box>
-            </VStack>
-          </ModalBody>
-        </ModalContent>
-      </Modal>
-
-      {/* Confirmation Modal */}
-      <Modal
+      <AppModal
         isOpen={isConfirmOpen}
         onClose={onConfirmClose}
         blockScrollOnMount={true}
         preserveScrollBarGap={true}
       >
-        <ModalOverlay backdropFilter="blur(10px)" />
-        <ModalContent
-          backdropFilter="blur(30px)"
-          bg={useColorModeValue("rgba(255, 255, 255, 0.48)", "rgba(26, 32, 44, 0.48)")}
-          borderRadius="xl"
-          boxShadow="xl"
-        >
-          <ModalHeader>Xác nhận xóa dữ liệu</ModalHeader>
-          <ModalCloseButton />
-          <Divider />
-          <ModalBody>
-            <Alert status="warning" mb={4} borderRadius="lg">
-              <AlertIcon />
-              <Box>
-                <AlertTitle>Chú ý!</AlertTitle>
-                <AlertDescription>
-                  Hành động này sẽ xóa toàn bộ dữ liệu bookmark của bạn trên cả Google Drive và máy tính. Hành động này không thể hoàn tác.
-                </AlertDescription>
-              </Box>
-            </Alert>
-            <Text color={textColor}>Bạn có chắc chắn muốn tiếp tục?</Text>
-          </ModalBody>
-          <Divider />
-          <Box p={4} display="flex" justifyContent="flex-end" gap={3}>
-            <Button variant="ghost" onClick={onConfirmClose}>
-              Hủy
-            </Button>
-            <Button
-              colorScheme="red"
-              onClick={handleClearAllData}
-              isLoading={restoring}
-              loadingText="Đang xóa..."
-            >
-              Xóa dữ liệu
-            </Button>
-          </Box>
-        </ModalContent>
-      </Modal>
+        <ModalHeader>Xác nhận xóa dữ liệu</ModalHeader>
+        <ModalCloseButton />
+        <Divider />
+        <ModalBody>
+          <Alert status="warning" mb={4} borderRadius="lg">
+            <AlertIcon />
+            <Box>
+              <AlertTitle>Chú ý!</AlertTitle>
+              <AlertDescription>
+                Hành động này sẽ xóa toàn bộ dữ liệu bookmark của bạn trên cả Google Drive và máy tính. Hành động này không thể hoàn tác.
+              </AlertDescription>
+            </Box>
+          </Alert>
+          <Text color={textColor}>Bạn có chắc chắn muốn tiếp tục?</Text>
+        </ModalBody>
+        <Divider />
+        <Box p={4} display="flex" justifyContent="flex-end" gap={3}>
+          <Button variant="ghost" onClick={onConfirmClose}>
+            Hủy
+          </Button>
+          <Button
+            colorScheme="red"
+            onClick={handleClearAllData}
+            isLoading={restoring}
+            loadingText="Đang xóa..."
+          >
+            Xóa dữ liệu
+          </Button>
+        </Box>
+      </AppModal>
     </>
   );
 };

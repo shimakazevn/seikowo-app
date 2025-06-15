@@ -1,12 +1,7 @@
 import React from 'react';
 import { MenuItem } from '../../../types/navigation';
-import {
-  SettingsIcon,
-  InfoIcon,
-  BellIcon,
-  SearchIcon
-} from '@chakra-ui/icons';
-import { FaHeart, FaHome, FaTags, FaUser } from 'react-icons/fa';
+import { FaBell, FaCog, FaHeart, FaHome, FaInfo, FaSearch, FaTags, FaUser } from 'react-icons/fa';
+import { SettingsIcon } from '@chakra-ui/icons';
 
 // Navigation constants
 export const NAV_HEIGHT = '60px';
@@ -30,25 +25,18 @@ export const SIDEBAR_TOP_ITEMS: MenuItem[] = [
   {
     name: 'search',
     path: '/search',
-    icon: React.createElement(SearchIcon),
-    isAction: true // Special flag for search action
-  },
-  {
-    name: 'user',
-    path: '/user',
-    icon: React.createElement(FaUser)
+    icon: React.createElement(FaSearch),
   },
   {
     name: 'Tags',
     path: '/tags',
     icon: React.createElement(FaTags)
   },
-  // Admin tab hidden from navigation
-  // {
-  //   name: 'admin',
-  //   path: '/admin',
-  //   icon: React.createElement(MdAdminPanelSettings)
-  // },
+  {
+    name: 'user',
+    path: '/user',
+    icon: React.createElement(FaUser)
+  },
 ];
 
 // Sidebar menu items - Bottom section
@@ -56,7 +44,7 @@ export const SIDEBAR_BOTTOM_ITEMS: MenuItem[] = [
   {
     name: 'settings',
     path: '/settings',
-    icon: React.createElement(SettingsIcon)
+    icon: React.createElement(FaCog)
   },
   {
     name: 'donate',
@@ -66,12 +54,12 @@ export const SIDEBAR_BOTTOM_ITEMS: MenuItem[] = [
   {
     name: 'updates',
     path: '/updates',
-    icon: React.createElement(BellIcon)
+    icon: React.createElement(FaBell)
   },
   {
     name: 'about',
     path: '/about',
-    icon: React.createElement(InfoIcon)
+    icon: React.createElement(FaInfo)
   }
 ];
 
@@ -91,7 +79,7 @@ export const BOTTOM_NAV_ITEMS: MenuItem[] = [
   {
     name: 'search',
     path: '/search',
-    icon: React.createElement(SearchIcon),
+    icon: React.createElement(FaSearch),
     isAction: true
   },
   {
@@ -102,7 +90,7 @@ export const BOTTOM_NAV_ITEMS: MenuItem[] = [
   {
     name: 'settings',
     path: '/settings',
-    icon: React.createElement(SettingsIcon)
+    icon: React.createElement(FaCog)
   }
 ];
 
@@ -126,8 +114,8 @@ export const NAV_COLORS = {
     dark: '#ffffff'
   },
   mutedTextColor: {
-    light: '#666666',
-    dark: '#888888'
+    light: '#444444',
+    dark: '#bbbbbb'
   }
 } as const;
 

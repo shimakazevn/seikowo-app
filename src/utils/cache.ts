@@ -6,7 +6,9 @@ const CACHE_DURATION = {
   PAGES: 30 * 60 * 1000,        // 30 minutes for pages (rarely change)
   TAGS: 60 * 60 * 1000,         // 1 hour for tags (very stable)
   USER_DATA: 24 * 60 * 60 * 1000, // 24 hours for user data
-  OFFLINE: 7 * 24 * 60 * 60 * 1000 // 7 days for offline fallback
+  OFFLINE: 7 * 24 * 60 * 60 * 1000, // 7 days for offline fallback
+  COMMENTS: 5 * 60 * 1000,      // 5 minutes for comments (frequently updated)
+  USER_COMMENTS: 10 * 60 * 1000 // 10 minutes for user comments (less frequently updated)
 } as const;
 
 export const CACHE_KEYS = {
@@ -18,7 +20,10 @@ export const CACHE_KEYS = {
   RSS_POSTS: 'cached_rss_posts',
   ATOM: 'cached_atom',
   ATOM_POSTS: 'cached_atom_posts',
-  OFFLINE_POSTS: 'offline_posts' // Long-term offline cache
+  ATOM_POSTS_PROGRESSIVE: 'cached_atom_posts_progressive',
+  OFFLINE_POSTS: 'offline_posts', // Long-term offline cache
+  COMMENTS: 'cached_comments',    // Cache for post comments
+  USER_COMMENTS: 'cached_user_comments' // Cache for user's comments
 } as const;
 
 export type CacheKey = typeof CACHE_KEYS[keyof typeof CACHE_KEYS];
@@ -28,11 +33,47 @@ interface CacheData<T> {
   timestamp: number;
 }
 
+// Initialize cache with default values
+export const initializeCache = async () => {
+  try {
+    const db = await openDatabase();
+    const tx = db.transaction('cache', 'readwrite');
+    const store = tx.objectStore('cache');
+
+    // Initialize ATOM_POSTS with empty array if not exists
+    const atomPosts = await store.get(CACHE_KEYS.ATOM_POSTS);
+    if (!atomPosts) {
+      await store.put({
+        id: CACHE_KEYS.ATOM_POSTS,
+        value: { items: [] },
+        timestamp: Date.now()
+      });
+    }
+
+    // Initialize ATOM_POSTS_PROGRESSIVE with empty array if not exists
+    const progressivePosts = await store.get(CACHE_KEYS.ATOM_POSTS_PROGRESSIVE);
+    if (!progressivePosts) {
+      await store.put({
+        id: CACHE_KEYS.ATOM_POSTS_PROGRESSIVE,
+        value: { items: [] },
+        timestamp: Date.now()
+      });
+    }
+  } catch (e) {
+    console.error('[Cache] Failed to initialize cache:', e);
+  }
+};
+
+// Call initializeCache when the module loads
+// initializeCache(); // Removed automatic initialization
+
 export const getCachedData = async <T>(key: CacheKey, customDuration?: number): Promise<T | null> => {
   try {
     const db = await openDatabase();
     const tx = db.transaction('cache', 'readonly');
     const store = tx.objectStore('cache');
+
+    console.log(`[Cache] Attempting to get data for key: ${key}`);
 
     return new Promise<T | null>((resolve, reject) => {
       const request = store.get(key);
@@ -40,10 +81,12 @@ export const getCachedData = async <T>(key: CacheKey, customDuration?: number): 
       request.onsuccess = () => {
         const result = request.result;
         if (!result) {
+          console.log(`[Cache] No data found for key: ${key}`);
           resolve(null);
           return;
         }
 
+        // Explicitly cast to unknown first, then to CacheData<T>
         const data = result as unknown as CacheData<T>;
         if (data && data.timestamp) {
           // Use custom duration or default based on cache key
@@ -51,22 +94,25 @@ export const getCachedData = async <T>(key: CacheKey, customDuration?: number): 
           const isCacheValid = (Date.now() - data.timestamp) < duration;
 
           if (isCacheValid) {
+            console.log(`[Cache] Valid cache found for key: ${key}. Data:`, data.value);
             resolve(data.value);
           } else {
+            console.log(`[Cache] Cache for key: ${key} is expired.`);
             resolve(null);
           }
         } else {
+          console.log(`[Cache] Invalid cache structure for key: ${key}.`);
           resolve(null);
         }
       };
 
       request.onerror = () => {
-        console.error('Failed to load cache from IndexedDB', request.error);
+        console.error('[Cache] Failed to load cache from IndexedDB', request.error);
         resolve(null);
       };
     });
   } catch (e) {
-    console.error('Failed to load cache from IndexedDB', e);
+    console.error('[Cache] Failed to load cache from IndexedDB', e);
     return null;
   }
 };
@@ -76,13 +122,17 @@ export const setCachedData = async <T>(key: CacheKey, data: T): Promise<void> =>
     const db = await openDatabase();
     const tx = db.transaction('cache', 'readwrite');
     const store = tx.objectStore('cache');
+
+    console.log(`[Cache] Attempting to set data for key: ${key}. Data:`, data);
+
     await store.put({
       id: key,
       value: data,
       timestamp: Date.now()
     });
+    console.log(`[Cache] Data successfully set for key: ${key}.`);
   } catch (e) {
-    console.error('Failed to save cache to IndexedDB', e);
+    console.error('[Cache] Failed to save cache to IndexedDB', e);
   }
 };
 
@@ -91,9 +141,11 @@ export const clearCache = async (key: CacheKey): Promise<void> => {
     const db = await openDatabase();
     const tx = db.transaction('cache', 'readwrite');
     const store = tx.objectStore('cache');
+    console.log(`[Cache] Attempting to clear cache for key: ${key}`);
     await store.delete(key);
+    console.log(`[Cache] Cache successfully cleared for key: ${key}.`);
   } catch (e) {
-    console.error('Failed to clear cache from IndexedDB', e);
+    console.error('[Cache] Failed to clear cache from IndexedDB', e);
   }
 };
 
@@ -113,6 +165,10 @@ const getCacheDuration = (key: CacheKey): number => {
       return CACHE_DURATION.USER_DATA;
     case CACHE_KEYS.OFFLINE_POSTS:
       return CACHE_DURATION.OFFLINE;
+    case CACHE_KEYS.COMMENTS:
+      return CACHE_DURATION.COMMENTS;
+    case CACHE_KEYS.USER_COMMENTS:
+      return CACHE_DURATION.USER_COMMENTS;
     default:
       return CACHE_DURATION.RSS_POSTS;
   }
@@ -142,7 +198,8 @@ export const getOfflineData = async <T>(key: CacheKey): Promise<T | null> => {
     const db = await openDatabase();
     const tx = db.transaction('cache', 'readonly');
     const store = tx.objectStore('cache');
-    const data = await store.get(offlineKey) as CacheData<T> | undefined;
+    // Explicitly cast to unknown first, then to CacheData<T>
+    const data = await store.get(offlineKey) as unknown as CacheData<T> | undefined;
 
     if (data && data.value) {
       console.log(`📱 Using offline data for ${key} (${Math.round((Date.now() - data.timestamp) / (24 * 60 * 60 * 1000))} days old)`);
@@ -166,9 +223,11 @@ export const clearCachedData = async (key: CacheKey): Promise<void> => {
     const db = await openDatabase();
     const tx = db.transaction('cache', 'readwrite');
     const store = tx.objectStore('cache');
+    console.log(`[Cache] Attempting to clear cache for key: ${key}`);
     await store.delete(key);
+    console.log(`[Cache] Cache successfully cleared for key: ${key}.`);
   } catch (e) {
-    console.error('Failed to clear cache from IndexedDB', e);
+    console.error('[Cache] Failed to clear cache from IndexedDB', e);
   }
 };
 

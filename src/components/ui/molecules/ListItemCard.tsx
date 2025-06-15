@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Box, Text, Image, Skeleton, Badge, HStack, VStack, Progress } from '@chakra-ui/react';
-import { optimizeThumbnail, getThumbnailBySlug, extractImage, getSlugFromUrl } from '../utils/blogUtils';
+import { optimizeThumbnail, getThumbnailBySlug, extractImage, getSlugFromUrl } from '../../../utils/blogUtils';
 import { motion } from 'framer-motion';
-import { getDataFromDB } from '../utils/indexedDBUtils';
-import { Post } from '../types/global';
+import { getDataFromDB } from '../../../utils/indexedDBUtils';
+import { Post } from '../../../types/global';
+import LazyImage from '../common/LazyImage';
 
 const MotionBox = motion(Box);
 
@@ -180,21 +181,13 @@ const HistoryCard: React.FC<HistoryCardProps> = ({
           {isLoading ? (
             <Skeleton height="200px" />
           ) : thumbnailUrl ? (
-            <Image
+            <LazyImage
               src={thumbnailUrl}
               alt={title || 'No title'}
               borderRadius="md"
               objectFit="cover"
               width="100%"
               height="200px"
-              fallback={<Skeleton height="200px" />}
-              onError={(e) => {
-                // If image fails to load, try to get a new one
-                const newThumbnail = getThumbnail();
-                if (newThumbnail !== thumbnailUrl) {
-                  setThumbnailUrl(newThumbnail);
-                }
-              }}
             />
           ) : (
             <Skeleton height="200px" />

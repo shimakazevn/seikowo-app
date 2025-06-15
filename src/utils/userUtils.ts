@@ -10,13 +10,16 @@ export const TOKEN_CACHE_DURATION = 1 * 60 * 60 * 1000; // 1 hour (This is for A
 
 export const getRefreshToken = async (): Promise<string | null> => {
   try {
-    return await withTransaction(['userData'], 'readonly', async (tx: IDBTransaction) => {
-      const store = tx.objectStore('userData');
+    return await withTransaction(['userData'], 'readonly', async () => {
       const data: TokenData | undefined = await getDataFromDB('userData', REFRESH_TOKEN_KEY);
       return data?.value || null;
     });
-  } catch (error: any) {
-    console.error('Error getting refresh token:', error);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('Error getting refresh token:', error.message);
+    } else {
+      console.error('Error getting refresh token: Unknown error', error);
+    }
     throw error;
   }
 };
@@ -27,15 +30,18 @@ export const setRefreshToken = async (token: string): Promise<void> => {
   }
 
   try {
-    await withTransaction(['userData'], 'readwrite', async (tx: IDBTransaction) => {
-      const store = tx.objectStore('userData');
+    await withTransaction(['userData'], 'readwrite', async () => {
       await saveDataToDB('userData', REFRESH_TOKEN_KEY, {
         value: token,
         timestamp: Date.now()
       });
     });
-  } catch (error: any) {
-    console.error('Error setting refresh token:', error);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('Error setting refresh token:', error.message);
+    } else {
+      console.error('Error setting refresh token: Unknown error', error);
+    }
     throw error;
   }
 };
@@ -43,13 +49,16 @@ export const setRefreshToken = async (token: string): Promise<void> => {
 export const clearTokens = async (): Promise<void> => {
   try {
     await withTransaction(['userData'], 'readwrite', async (tx: IDBTransaction) => {
-      const store = tx.objectStore('userData');
       await Promise.all([
-        store.delete(REFRESH_TOKEN_KEY)
+        tx.objectStore('userData').delete(REFRESH_TOKEN_KEY)
       ]);
     });
-  } catch (error: any) {
-    console.error('Error clearing tokens:', error);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('Error clearing tokens:', error.message);
+    } else {
+      console.error('Error clearing tokens: Unknown error', error);
+    }
     throw error;
   }
 };
@@ -57,8 +66,7 @@ export const clearTokens = async (): Promise<void> => {
 // User info management with improved error handling
 export const getUserInfo = async (): Promise<UserInfoData | null> => {
   try {
-    return await withTransaction(['userData'], 'readonly', async (tx: IDBTransaction) => {
-      const store = tx.objectStore('userData');
+    return await withTransaction(['userData'], 'readonly', async () => {
       const data: UserInfoData | undefined = await getDataFromDB('userData', USER_INFO_KEY);
 
       if (data && data.timestamp) {
@@ -67,8 +75,12 @@ export const getUserInfo = async (): Promise<UserInfoData | null> => {
       }
       return null;
     });
-  } catch (error: any) {
-    console.error('Error getting user info:', error);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('Error getting user info:', error.message);
+    } else {
+      console.error('Error getting user info: Unknown error', error);
+    }
     throw error;
   }
 };
@@ -79,15 +91,18 @@ export const setUserInfo = async (userInfo: User): Promise<void> => {
   }
 
   try {
-    await withTransaction(['userData'], 'readwrite', async (tx: IDBTransaction) => {
-      const store = tx.objectStore('userData');
+    await withTransaction(['userData'], 'readwrite', async () => {
       await saveDataToDB('userData', USER_INFO_KEY, {
         ...userInfo,
         timestamp: Date.now()
       });
     });
-  } catch (error: any) {
-    console.error('Error setting user info:', error);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('Error setting user info:', error.message);
+    } else {
+      console.error('Error setting user info: Unknown error', error);
+    }
     throw error;
   }
 };
@@ -95,11 +110,14 @@ export const setUserInfo = async (userInfo: User): Promise<void> => {
 export const clearUserInfo = async (): Promise<void> => {
   try {
     await withTransaction(['userData'], 'readwrite', async (tx: IDBTransaction) => {
-      const store = tx.objectStore('userData');
-      await store.delete(USER_INFO_KEY);
+      await tx.objectStore('userData').delete(USER_INFO_KEY);
     });
-  } catch (error: any) {
-    console.error('Error clearing user info:', error);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('Error clearing user info:', error.message);
+    } else {
+      console.error('Error clearing user info: Unknown error', error);
+    }
     throw error;
   }
 };
@@ -111,13 +129,16 @@ export const getUserData = async (userId: string): Promise<User | null> => {
   }
 
   try {
-    return await withTransaction(['userData'], 'readonly', async (tx: IDBTransaction) => {
-      const store = tx.objectStore('userData');
+    return await withTransaction(['userData'], 'readonly', async () => {
       const data: User | undefined = await getDataFromDB('userData', userId);
       return data || null;
     });
-  } catch (error: any) {
-    console.error('Error getting user data:', error);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('Error getting user data:', error.message);
+    } else {
+      console.error('Error getting user data: Unknown error', error);
+    }
     throw error;
   }
 };
@@ -128,15 +149,18 @@ export const saveUserData = async (userId: string, userData: User): Promise<void
   }
 
   try {
-    await withTransaction(['userData'], 'readwrite', async (tx: IDBTransaction) => {
-      const store = tx.objectStore('userData');
+    await withTransaction(['userData'], 'readwrite', async () => {
       await saveDataToDB('userData', userId, {
         ...userData,
         timestamp: Date.now()
       });
     });
-  } catch (error: any) {
-    console.error('Error saving user data:', error);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('Error saving user data:', error.message);
+    } else {
+      console.error('Error saving user data: Unknown error', error);
+    }
     throw error;
   }
 };
@@ -148,11 +172,14 @@ export const deleteUserData = async (userId: string): Promise<void> => {
 
   try {
     await withTransaction(['userData'], 'readwrite', async (tx: IDBTransaction) => {
-      const store = tx.objectStore('userData');
-      await store.delete(userId);
+      await tx.objectStore('userData').delete(userId);
     });
-  } catch (error: any) {
-    console.error('Error deleting user data:', error);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('Error deleting user data:', error.message);
+    } else {
+      console.error('Error deleting user data: Unknown error', error);
+    }
     throw error;
   }
 };
@@ -161,14 +188,17 @@ export const deleteUserData = async (userId: string): Promise<void> => {
 export const clearUserSession = async (): Promise<void> => {
   try {
     await withTransaction(['userData'], 'readwrite', async (tx: IDBTransaction) => {
-      const store = tx.objectStore('userData');
       await Promise.all([
-        store.delete(REFRESH_TOKEN_KEY),
-        store.delete(USER_INFO_KEY)
+        tx.objectStore('userData').delete(REFRESH_TOKEN_KEY),
+        tx.objectStore('userData').delete(USER_INFO_KEY)
       ]);
     });
-  } catch (error: any) {
-    console.error('Error clearing user session:', error);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('Error clearing user session:', error.message);
+    } else {
+      console.error('Error clearing user session: Unknown error', error);
+    }
     throw error;
   }
 };

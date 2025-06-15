@@ -245,21 +245,39 @@ export const fetchPostsSecurely = async (params: FetchPostsSecurelyParams = {}):
     if (useCache) {
       const cachedData = await getCachedData(cacheKey);
       if (cachedData) {
+        console.log(`[ProxyService] Using cached data for batch ${startIndex}`);
         return cachedData as AtomFeedResponse;
       }
     }
 
+    console.log(`[ProxyService] Fetching fresh data for batch ${startIndex}`);
     // Fetch batch (20 posts)
     const corsData = await fetchPostsViaCORS(maxResults, startIndex);
 
     // Cache the result for this specific page
-    if (useCache) {
-      setCachedData(cacheKey, corsData);
+    if (useCache && corsData && corsData.items) {
+      console.log(`[ProxyService] Caching ${corsData.items.length} posts for batch ${startIndex}`);
+      await setCachedData(cacheKey, corsData);
+      
+      // Also update the main ATOM_POSTS cache
+      const mainCacheKey = CACHE_KEYS.ATOM_POSTS;
+      const mainCacheData = await getCachedData<AtomFeedResponse>(mainCacheKey) || { items: [] };
+      const existingItems = mainCacheData.items || [];
+      const newItems = corsData.items.filter(newItem => 
+        !existingItems.some((existingItem: { id: string }) => existingItem.id === newItem.id)
+      );
+      
+      if (newItems.length > 0) {
+        console.log(`[ProxyService] Updating main cache with ${newItems.length} new posts`);
+        await setCachedData(mainCacheKey, {
+          items: [...existingItems, ...newItems]
+        });
+      }
     }
 
     return corsData;
   } catch (error: any) {
-    console.error('fetchPostsSecurely failed:', error);
+    console.error('[ProxyService] fetchPostsSecurely failed:', error);
     throw handleError(error);
   }
 };

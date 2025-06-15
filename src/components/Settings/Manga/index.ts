@@ -1,0 +1,1 @@
+export { default as MangaEditForm } from './MangaEditForm'; 

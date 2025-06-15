@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getHistoryData, saveHistoryData } from '../utils/indexedDBUtils';
 import { backupUserData, restoreUserData, deleteUserData } from '../api/auth';
-import type { FavoritePost, MangaBookmark, Post, ToastFunction } from '../types';
+import type { FavoritePost, MangaBookmark, Post, ToastFunction, ReadPost } from '../types';
 
 interface SyncResult {
   favorites: FavoritePost[];
@@ -13,6 +13,7 @@ interface SyncResult {
 interface FavoriteBookmarkStore {
   favorites: FavoritePost[];
   bookmarks: MangaBookmark[];
+  reads: ReadPost[];
   loading: boolean;
   error: string | null;
   lastSyncTimestamp: number | null;
@@ -25,6 +26,9 @@ interface FavoriteBookmarkStore {
   getBookmarkData: (mangaId: string) => MangaBookmark | undefined;
   syncGuestData: (userId: string, toast?: ToastFunction) => Promise<SyncResult | false>;
   syncData: (userId: string, accessToken: string | null, toast?: ToastFunction) => Promise<boolean>;
+  setFavorites: (favorites: FavoritePost[]) => void;
+  setBookmarks: (bookmarks: MangaBookmark[]) => void;
+  setReads: (reads: ReadPost[]) => void;
   resetStore: () => void;
 }
 
@@ -32,6 +36,7 @@ interface FavoriteBookmarkStore {
 type PersistedState = {
   favorites: FavoritePost[];
   bookmarks: MangaBookmark[];
+  reads: ReadPost[];
   lastSyncTimestamp: number | null;
 };
 
@@ -40,6 +45,7 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>()(
     (set, get) => ({
       favorites: [],
       bookmarks: [],
+      reads: [],
       loading: false,
       error: null,
       lastSyncTimestamp: null,
@@ -52,14 +58,16 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>()(
 
         set({ loading: true, error: null });
         try {
-          const [localFavorites, localBookmarks] = await Promise.all([
+          const [localFavorites, localBookmarks, localReads] = await Promise.all([
             getHistoryData('favorites', userId),
-            getHistoryData('bookmarks', userId)
+            getHistoryData('bookmarks', userId),
+            getHistoryData('reads', userId)
           ]);
 
           set({
             favorites: Array.isArray(localFavorites) ? localFavorites as FavoritePost[] : [],
             bookmarks: Array.isArray(localBookmarks) ? localBookmarks as MangaBookmark[] : [],
+            reads: Array.isArray(localReads) ? localReads.map((item: any) => ({ id: item.id, readAt: item.timestamp })) : [],
             loading: false
           });
         } catch (error: any) {
@@ -520,10 +528,15 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>()(
         }
       },
 
+      setFavorites: (favorites: FavoritePost[]) => set({ favorites }),
+      setBookmarks: (bookmarks: MangaBookmark[]) => set({ bookmarks }),
+      setReads: (reads: ReadPost[]) => set({ reads }),
+
       resetStore: () => {
         set({
           favorites: [],
           bookmarks: [],
+          reads: [],
           loading: false,
           error: null,
           lastSyncTimestamp: null // Reset timestamp on store reset
@@ -535,6 +548,7 @@ const useFavoriteBookmarkStore = create<FavoriteBookmarkStore>()(
       partialize: (state) => ({
         favorites: state.favorites,
         bookmarks: state.bookmarks,
+        reads: state.reads,
         lastSyncTimestamp: state.lastSyncTimestamp,
       } as PersistedState),
     }

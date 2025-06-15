@@ -26,9 +26,43 @@ export default defineConfig({
         rewrite: (path) => {
           try {
             const url = new URL(decodeURIComponent(path.replace('/api/blogger?url=', '')));
-            const newPath = url.pathname + url.search;
-            console.log('Rewriting path:', path, 'to:', newPath);
-            return newPath;
+            const newPath = url.pathname;
+            console.log('Rewriting path:', path, 'to:', newPath + url.search);
+            return newPath + url.search;
+          } catch (error) {
+            console.error('Error rewriting path:', error);
+            return path;
+          }
+        },
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.error('Proxy error:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            console.log('Sending Request:', {
+              method: req.method,
+              originalUrl: req.url,
+              targetUrl: proxyReq.path
+            });
+          });
+          proxy.on('proxyRes', (proxyRes, req, _res) => {
+            console.log('Received Response:', {
+              statusCode: proxyRes.statusCode,
+              url: req.url,
+              headers: proxyRes.headers
+            });
+          });
+        },
+      },
+      '/api/blogger-json': {
+        target: 'https://www.googleapis.com',
+        changeOrigin: true,
+        rewrite: (path) => {
+          try {
+            const url = new URL(decodeURIComponent(path.replace('/api/blogger-json?url=', '')));
+            const newPath = url.pathname.startsWith('/blogger/v3') ? url.pathname : `/blogger/v3${url.pathname}`;
+            console.log('Rewriting path:', path, 'to:', newPath + url.search);
+            return newPath + url.search;
           } catch (error) {
             console.error('Error rewriting path:', error);
             return path;

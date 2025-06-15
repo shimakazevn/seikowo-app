@@ -9,13 +9,19 @@ import {
   useColorMode
 } from '@chakra-ui/react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { MenuItem } from '../../types/navigation';
-import { SIDEBAR_WIDTH, NAV_Z_INDEX, NAV_COLORS, SIDEBAR_TOP_ITEMS, SIDEBAR_BOTTOM_ITEMS } from './NavConstants';
+import { NAV_Z_INDEX, NAV_COLORS, SIDEBAR_TOP_ITEMS, SIDEBAR_BOTTOM_ITEMS } from './NavConstants';
 
 interface SidebarNavProps {
   activeColor?: string;
   textColor?: string;
   onSearchOpen?: () => void;
+}
+
+export interface MenuItem {
+  name: string;
+  path: string;
+  icon?: React.ReactNode;
+  isAction?: boolean;
 }
 
 const SidebarNav: React.FC<SidebarNavProps> = memo(({
@@ -30,11 +36,7 @@ const SidebarNav: React.FC<SidebarNavProps> = memo(({
   // Dynamic colors based on theme using NAV_COLORS
   const isDark = colorMode === 'dark';
   const bgColor = isDark ? NAV_COLORS.solidBg.dark : NAV_COLORS.solidBg.light;
-  const borderColor = isDark ? NAV_COLORS.borderColor.dark : NAV_COLORS.borderColor.light;
   const defaultTextColor = isDark ? NAV_COLORS.textColor.dark : NAV_COLORS.textColor.light;
-  const mutedColor = isDark ? NAV_COLORS.mutedTextColor.dark : NAV_COLORS.mutedTextColor.light;
-
-  const finalTextColor = textColor || defaultTextColor;
 
   // Button colors exactly matching the design in the image
   const buttonBg = isDark ? '#2a2a2a' : '#f0f0f0';
@@ -66,8 +68,7 @@ const SidebarNav: React.FC<SidebarNavProps> = memo(({
       top={0}
       bottom={0}
       minWidth="80px"
-      bg={isDark ? '#131313' : '#f4f4f4'}
-      borderRight={isDark ? 'none' : `1px solid #e5e5e5`}
+      bg={bgColor}
       zIndex={NAV_Z_INDEX - 1}
       display={{ base: 'none', lg: 'flex' }}
       flexDirection="column"
@@ -82,7 +83,7 @@ const SidebarNav: React.FC<SidebarNavProps> = memo(({
           color={buttonTextColor}
           textAlign="center"
         >
-          Seikowo <br /> Team
+          seikowo
         </Text>
       </Box>
 

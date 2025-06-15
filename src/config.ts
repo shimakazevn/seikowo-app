@@ -1,5 +1,7 @@
 // Thông tin cấu hình blog và OAuth
 
+import { DRIVE_SCOPE } from './constants/authScopes';
+
 interface SocialLinks {
   twitter?: string;
   github?: string;
@@ -17,6 +19,7 @@ interface BlogConfig {
   clientSecret?: string;
   redirectUri?: string;
   scope: string;
+  userSyncInterval?: number;
 }
 
 interface MenuItem {
@@ -41,23 +44,37 @@ export const blogConfig: BlogConfig = {
     (typeof window !== 'undefined' && window.location.hostname === 'localhost'
       ? 'http://localhost:80'
       : 'https://seikowo-app.blogspot.com'),
-  scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive.appdata',
+  scope: DRIVE_SCOPE,
+  userSyncInterval: 24 * 60 * 60 * 1000, // 24 hours
 };
 
-// Admin configuration
 export const adminConfig = {
-  // List of admin emails - add your admin emails here
-  adminEmails: [
-    'shimakazevn@gmail.com',
-    'admin@seikowoteam.blogspot.com',
-    // Add more admin emails as needed
-  ],
+  // Cấu hình cho admin (người quản trị)
+  adminEmails: ['shimakazevn@gmail.com'], // Email của admin
+  blogId: '5603145815846388386', // Blog ID của bạn
+  apiKey: import.meta.env.VITE_GOOGLE_API_KEY,
+  clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+  clientSecret: import.meta.env.VITE_GOOGLE_CLIENT_SECRET,
+  redirectUri: import.meta.env.VITE_GOOGLE_REDIRECT_URI,
+  scopes: [
+    'https://www.googleapis.com/auth/blogger',
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'https://www.googleapis.com/auth/userinfo.email'
+  ]
+};
 
-  // Check if user is admin
-  isAdmin: (userEmail?: string): boolean => {
-    if (!userEmail) return false;
-    return adminConfig.adminEmails.includes(userEmail.toLowerCase());
-  }
+// Cấu hình cho tác giả
+export const authorConfig = {
+  blogId: '5603145815846388386', // Blog ID của bạn
+  apiKey: import.meta.env.VITE_GOOGLE_API_KEY,
+  clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+  clientSecret: import.meta.env.VITE_GOOGLE_CLIENT_SECRET,
+  redirectUri: import.meta.env.VITE_GOOGLE_REDIRECT_URI,
+  scopes: [
+    'https://www.googleapis.com/auth/blogger',
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'https://www.googleapis.com/auth/userinfo.email'
+  ]
 };
 
 // Menu chính của ứng dụng

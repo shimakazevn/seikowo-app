@@ -97,6 +97,13 @@ export const userRoutes: RouteGroup = {
       element: LazyRoutes.UserPage, 
       layout: 'subtle',
       title: 'Profile'
+    },
+    {
+      path: '/user/posts',
+      element: LazyRoutes.PostsManagement,
+      layout: 'subtle',
+      protected: true,
+      title: 'Manage Posts'
     }
   ]
 };
@@ -129,7 +136,14 @@ export const featureRoutes: RouteGroup = {
       layout: 'modal',
       protected: true,
       title: 'Edit Post'
-    }
+    },
+    // {
+    //   path: '/upload-images',
+    //   element: LazyRoutes.ImageUploadPage,
+    //   layout: 'subtle',
+    //   title: 'Upload Images',
+    //   description: 'Upload images to your Blogger posts'
+    // }
   ]
 };
 
@@ -145,13 +159,13 @@ export const blogRoutes: RouteGroup = {
     },
     { 
       path: '/:year/:month/:slug.html', 
-      element: LazyRoutes.PostPageWrapper, 
+      element: LazyRoutes.PostPage, 
       layout: 'default',
       title: 'Blog Post'
     },
     { 
       path: '/:slug.html', 
-      element: LazyRoutes.PostPageWrapper, 
+      element: LazyRoutes.PostPage, 
       layout: 'default',
       title: 'Blog Post'
     }

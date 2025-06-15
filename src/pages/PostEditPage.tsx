@@ -32,7 +32,8 @@ import {
 import { MdSave, MdPublish, MdArrowBack, MdDrafts } from 'react-icons/md';
 import { useAuthContext } from '../contexts/AuthContext';
 import { bloggerAdminService, BloggerPost, UpdatePostRequest } from '../services/bloggerAdminService';
-import RichTextEditor from '../components/Settings/Admin/RichTextEditor';
+import RichTextEditor from '../components/Settings/PostsList/Editor';
+import { MangaEditForm } from '../components/Settings/Manga';
 
 interface PostFormData {
   title: string;
@@ -67,6 +68,8 @@ const PostEditPage: React.FC = () => {
   
   const [formErrors, setFormErrors] = useState<Partial<PostFormData>>({});
 
+  const [editMode, setEditMode] = useState<'normal' | 'manga'>('normal');
+
   // Load post data
   useEffect(() => {
     if (isAuthenticated && postId) {
@@ -89,7 +92,7 @@ const PostEditPage: React.FC = () => {
         title: postData.title || '',
         content: postData.content || '',
         labels: postData.labels || [],
-        status: postData.status || 'DRAFT'
+        status: postData.status === 'LIVE' ? 'LIVE' : 'DRAFT'
       });
 
       console.log('[PostEdit] Post loaded successfully:', {
@@ -127,7 +130,7 @@ const PostEditPage: React.FC = () => {
       // Redirect back to admin after a delay if post not found
       if (error.message?.includes('Not Found')) {
         setTimeout(() => {
-          navigate('/admin');
+          navigate('/settings/posts');
         }, 3000);
       }
     } finally {
@@ -251,144 +254,161 @@ const PostEditPage: React.FC = () => {
   return (
     <Container maxW="container.xl" py={8}>
       <VStack spacing={6} align="stretch">
-        {/* Header */}
-        <Box>
-          <Breadcrumb mb={4}>
-            <BreadcrumbItem>
-              <BreadcrumbLink onClick={() => navigate('/admin')}>
-                Quản trị
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbItem isCurrentPage>
-              <BreadcrumbLink>Chỉnh sửa bài viết</BreadcrumbLink>
-            </BreadcrumbItem>
-          </Breadcrumb>
-          
-          <HStack justify="space-between" align="start">
-            <Box>
-              <Text fontSize="2xl" fontWeight="bold" mb={2}>
-                Chỉnh Sửa Bài Viết
-              </Text>
-              <Text color="gray.500" fontSize="sm">
-                ID: {postId} • Trạng thái: {formData.status === 'LIVE' ? 'Đã xuất bản' : 'Bản nháp'}
-              </Text>
-            </Box>
-            
-            <Button
-              leftIcon={<MdArrowBack />}
-              variant="outline"
-              onClick={() => navigate('/admin')}
-            >
-              Quay lại
-            </Button>
-          </HStack>
+        {/* Select chế độ đăng bài */}
+        <Box maxW="300px" mb={2}>
+          <FormControl>
+            <FormLabel>Chế độ đăng</FormLabel>
+            <Select value={editMode} onChange={e => setEditMode(e.target.value as 'normal' | 'manga')}>
+              <option value="normal">Bài viết thường</option>
+              <option value="manga">Manga dài tập</option>
+            </Select>
+          </FormControl>
         </Box>
-
-        {/* Action Buttons */}
-        <HStack spacing={4} wrap="wrap">
-          <Button
-            leftIcon={<MdSave />}
-            colorScheme="blue"
-            onClick={() => handleSave()}
-            isLoading={isSaving}
-            loadingText="Đang lưu..."
-          >
-            Lưu Nháp
-          </Button>
-          
-          {formData.status === 'DRAFT' && (
-            <Button
-              leftIcon={<MdPublish />}
-              colorScheme="green"
-              onClick={() => handleSave('LIVE')}
-              isLoading={isSaving}
-              loadingText="Đang xuất bản..."
-            >
-              Xuất Bản
-            </Button>
-          )}
-          
-          {formData.status === 'LIVE' && (
-            <Button
-              leftIcon={<MdDrafts />}
-              colorScheme="orange"
-              onClick={() => handleSave('DRAFT')}
-              isLoading={isSaving}
-              loadingText="Đang chuyển..."
-            >
-              Chuyển về Nháp
-            </Button>
-          )}
-        </HStack>
-
-        {/* Edit Form */}
-        <Box bg={bgColor} p={6} borderRadius="lg" border="1px" borderColor={borderColor}>
-          <VStack spacing={4} align="stretch">
-            {/* Title */}
-            <FormControl isInvalid={!!formErrors.title}>
-              <FormLabel>Tiêu đề</FormLabel>
-              <Input
-                value={formData.title}
-                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Nhập tiêu đề bài viết..."
-              />
-              <FormErrorMessage>{formErrors.title}</FormErrorMessage>
-            </FormControl>
-
-            {/* Content */}
-            <FormControl isInvalid={!!formErrors.content}>
-              <FormLabel>Nội dung</FormLabel>
-              <RichTextEditor
-                value={formData.content}
-                onChange={(content) => setFormData(prev => ({ ...prev, content }))}
-                placeholder="Nhập nội dung bài viết (hỗ trợ HTML)..."
-                minHeight="500px"
-              />
-              <FormErrorMessage>{formErrors.content}</FormErrorMessage>
-            </FormControl>
-
-            {/* Labels */}
-            <FormControl>
-              <FormLabel>Thẻ (Tags)</FormLabel>
-              <HStack>
-                <Input
-                  value={newLabel}
-                  onChange={(e) => setNewLabel(e.target.value)}
-                  placeholder="Thêm thẻ..."
-                  onKeyPress={(e) => e.key === 'Enter' && addLabel()}
-                />
-                <Button onClick={addLabel} colorScheme="blue" variant="outline">
-                  Thêm
+        {/* Nếu chọn manga thì hiển thị MangaEditForm, ngược lại giữ nguyên UI cũ */}
+        {editMode === 'manga' ? (
+          <MangaEditForm />
+        ) : (
+          <>
+            {/* Header */}
+            <Box>
+              <Breadcrumb mb={4}>
+                <BreadcrumbItem>
+                  <BreadcrumbLink onClick={() => navigate('/settings/posts')}>
+                    Quản trị
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbItem isCurrentPage>
+                  <BreadcrumbLink>Chỉnh sửa bài viết</BreadcrumbLink>
+                </BreadcrumbItem>
+              </Breadcrumb>
+              
+              <HStack justify="space-between" align="start">
+                <Box>
+                  <Text fontSize="2xl" fontWeight="bold" mb={2}>
+                    Chỉnh Sửa Bài Viết
+                  </Text>
+                  <Text color="gray.500" fontSize="sm">
+                    ID: {postId} • Trạng thái: {formData.status === 'LIVE' ? 'Đã xuất bản' : 'Bản nháp'}
+                  </Text>
+                </Box>
+                
+                <Button
+                  leftIcon={<MdArrowBack />}
+                  variant="outline"
+                  onClick={() => navigate('/settings/posts')}
+                >
+                  Quay lại
                 </Button>
               </HStack>
-              
-              {formData.labels.length > 0 && (
-                <Wrap mt={2}>
-                  {formData.labels.map((label) => (
-                    <WrapItem key={label}>
-                      <Tag size="md" colorScheme="blue" borderRadius="full">
-                        <TagLabel>{label}</TagLabel>
-                        <TagCloseButton onClick={() => removeLabel(label)} />
-                      </Tag>
-                    </WrapItem>
-                  ))}
-                </Wrap>
-              )}
-            </FormControl>
+            </Box>
 
-            {/* Status */}
-            <FormControl>
-              <FormLabel>Trạng thái</FormLabel>
-              <Select
-                value={formData.status}
-                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as 'DRAFT' | 'LIVE' }))}
+            {/* Action Buttons */}
+            <HStack spacing={4} wrap="wrap">
+              <Button
+                leftIcon={<MdSave />}
+                colorScheme="blue"
+                onClick={() => handleSave()}
+                isLoading={isSaving}
+                loadingText="Đang lưu..."
               >
-                <option value="DRAFT">Bản nháp</option>
-                <option value="LIVE">Xuất bản</option>
-              </Select>
-            </FormControl>
-          </VStack>
-        </Box>
+                Lưu Nháp
+              </Button>
+              
+              {formData.status === 'DRAFT' && (
+                <Button
+                  leftIcon={<MdPublish />}
+                  colorScheme="green"
+                  onClick={() => handleSave('LIVE')}
+                  isLoading={isSaving}
+                  loadingText="Đang xuất bản..."
+                >
+                  Xuất Bản
+                </Button>
+              )}
+              
+              {formData.status === 'LIVE' && (
+                <Button
+                  leftIcon={<MdDrafts />}
+                  colorScheme="orange"
+                  onClick={() => handleSave('DRAFT')}
+                  isLoading={isSaving}
+                  loadingText="Đang chuyển..."
+                >
+                  Chuyển về Nháp
+                </Button>
+              )}
+            </HStack>
+
+            {/* Edit Form */}
+            <Box bg={bgColor} p={6} borderRadius="lg" border="1px" borderColor={borderColor}>
+              <VStack spacing={4} align="stretch">
+                {/* Title */}
+                <FormControl isInvalid={!!formErrors.title}>
+                  <FormLabel>Tiêu đề</FormLabel>
+                  <Input
+                    value={formData.title}
+                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="Nhập tiêu đề bài viết..."
+                  />
+                  <FormErrorMessage>{formErrors.title}</FormErrorMessage>
+                </FormControl>
+
+                {/* Content */}
+                <FormControl isInvalid={!!formErrors.content}>
+                  <FormLabel>Nội dung</FormLabel>
+                  <RichTextEditor
+                    value={formData.content}
+                    onChange={(content) => setFormData(prev => ({ ...prev, content }))}
+                    placeholder="Nhập nội dung bài viết (hỗ trợ HTML)..."
+                    minHeight="500px"
+                  />
+                  <FormErrorMessage>{formErrors.content}</FormErrorMessage>
+                </FormControl>
+
+                {/* Labels */}
+                <FormControl>
+                  <FormLabel>Thẻ (Tags)</FormLabel>
+                  <HStack>
+                    <Input
+                      value={newLabel}
+                      onChange={(e) => setNewLabel(e.target.value)}
+                      placeholder="Thêm thẻ..."
+                      onKeyPress={(e) => e.key === 'Enter' && addLabel()}
+                    />
+                    <Button onClick={addLabel} colorScheme="blue" variant="outline">
+                      Thêm
+                    </Button>
+                  </HStack>
+                  
+                  {formData.labels.length > 0 && (
+                    <Wrap mt={2}>
+                      {formData.labels.map((label) => (
+                        <WrapItem key={label}>
+                          <Tag size="md" colorScheme="blue" borderRadius="full">
+                            <TagLabel>{label}</TagLabel>
+                            <TagCloseButton onClick={() => removeLabel(label)} />
+                          </Tag>
+                        </WrapItem>
+                      ))}
+                    </Wrap>
+                  )}
+                </FormControl>
+
+                {/* Status */}
+                <FormControl>
+                  <FormLabel>Trạng thái</FormLabel>
+                  <Select
+                    value={formData.status}
+                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value === 'LIVE' ? 'LIVE' : 'DRAFT' }))}
+                  >
+                    <option value="DRAFT">Bản nháp</option>
+                    <option value="LIVE">Xuất bản</option>
+                  </Select>
+                </FormControl>
+              </VStack>
+            </Box>
+          </>
+        )}
       </VStack>
     </Container>
   );

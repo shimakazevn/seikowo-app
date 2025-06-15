@@ -30,7 +30,7 @@ export class SecureStorage {
   /**
    * Get or generate encryption key for a specific context
    */
-  private async getEncryptionKey(keyName: string, sessionKey: boolean = true): Promise<string> {
+  private getEncryptionKey(keyName: string, sessionKey: boolean = true): string {
     console.log(`[SecureStorage] Getting encryption key: ${keyName}, sessionKey: ${sessionKey}`);
 
     // Check memory cache first
@@ -67,7 +67,7 @@ export class SecureStorage {
     try {
       console.log(`[SecureStorage] Encrypting data with key: ${keyName}`);
 
-      const key = await this.getEncryptionKey(keyName, sessionKey);
+      const key = this.getEncryptionKey(keyName, sessionKey);
       if (!key || key.length === 0) {
         throw new Error('Invalid encryption key');
       }
@@ -91,9 +91,13 @@ export class SecureStorage {
       const result = btoa(encrypted);
       console.log(`[SecureStorage] Data encrypted successfully, result length: ${result.length}`);
       return result;
-    } catch (error) {
-      console.error('[SecureStorage] Encryption error:', error);
-      throw new Error(`Failed to encrypt data: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error('[SecureStorage] Encryption error:', error.message);
+        throw new Error(`Failed to encrypt data: ${error.message}`);
+      }
+      console.error('[SecureStorage] Encryption error: Unknown error', error);
+      throw new Error(`Failed to encrypt data: Unknown error`);
     }
   }
 
@@ -104,7 +108,7 @@ export class SecureStorage {
     try {
       console.log(`[SecureStorage] Decrypting data with key: ${keyName}`);
 
-      const key = await this.getEncryptionKey(keyName, sessionKey);
+      const key = this.getEncryptionKey(keyName, sessionKey);
       if (!key || key.length === 0) {
         throw new Error('Invalid decryption key');
       }
@@ -132,9 +136,13 @@ export class SecureStorage {
       }
 
       throw new Error('Invalid encrypted data format');
-    } catch (error) {
-      console.error('[SecureStorage] Decryption error:', error);
-      throw new Error(`Failed to decrypt data: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error('[SecureStorage] Decryption error:', error.message);
+        throw new Error(`Failed to decrypt data: ${error.message}`);
+      }
+      console.error('[SecureStorage] Decryption error: Unknown error', error);
+      throw new Error(`Failed to decrypt data: Unknown error`);
     }
   }
 
@@ -143,7 +151,7 @@ export class SecureStorage {
    */
   async setItem(
     key: string,
-    data: any,
+    data: unknown,
     options: SecureStorageOptions = {}
   ): Promise<void> {
     const {
@@ -172,8 +180,8 @@ export class SecureStorage {
           keyName,
           sessionKey
         });
-      } catch (storeError) {
-        if (storeError.message?.includes('not found') && storeName === 'secureStorage') {
+      } catch (storeError: unknown) {
+        if (storeError instanceof Error && storeError.message?.includes('not found') && storeName === 'secureStorage') {
           console.warn(`[SecureStorage] Store '${storeName}' not found, falling back to 'cache'`);
           actualStoreName = 'cache';
           await saveDataToDB(actualStoreName, key, {
@@ -182,29 +190,35 @@ export class SecureStorage {
             keyName,
             sessionKey
           });
-        } else {
+        } else if (storeError instanceof Error) {
           throw storeError;
+        } else {
+          throw new Error(`Unknown error during store operation: ${storeError}`);
         }
       }
 
       console.log(`[SecureStorage] Data stored securely in '${actualStoreName}': ${key}`);
-    } catch (error) {
-      console.error(`[SecureStorage] Failed to store ${key}:`, error);
-      console.error(`[SecureStorage] Error details:`, {
-        message: error.message,
-        stack: error.stack,
-        storeName,
-        keyName,
-        sessionKey
-      });
-      throw new Error(`SecureStorage setItem failed: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error(`[SecureStorage] Failed to store ${key}:`, error.message);
+        console.error(`[SecureStorage] Error details:`, {
+          message: error.message,
+          stack: error.stack,
+          storeName,
+          keyName,
+          sessionKey
+        });
+        throw new Error(`SecureStorage setItem failed: ${error.message}`);
+      }
+      console.error(`[SecureStorage] Failed to store ${key}: Unknown error`, error);
+      throw new Error(`SecureStorage setItem failed: Unknown error`);
     }
   }
 
   /**
    * Retrieve data securely
    */
-  async getItem<T = any>(
+  async getItem<T = unknown>(
     key: string,
     options: SecureStorageOptions = {}
   ): Promise<T | null> {
@@ -215,51 +229,49 @@ export class SecureStorage {
     } = options;
 
     try {
-      // Try preferred store first, then fallback to 'cache'
-      let storedData: any = null;
+      console.log(`[SecureStorage] Attempting to retrieve: ${key}`);
+      let retrievedData;
       let actualStoreName = storeName;
 
       try {
-        storedData = await getDataFromDB<{
-          data: string;
-          timestamp: number;
-          keyName: string;
-          sessionKey: boolean;
-        }>(storeName, key);
-      } catch (storeError) {
-        if (storeError.message?.includes('not found') && storeName === 'secureStorage') {
-          console.warn(`[SecureStorage] Store '${storeName}' not found, trying 'cache'`);
+        retrievedData = await getDataFromDB<{data: string;timestamp: number;keyName: string;sessionKey: boolean;}>(storeName, key);
+      } catch (retrieveError: unknown) {
+        if (retrieveError instanceof Error && retrieveError.message?.includes('not found') && storeName === 'secureStorage') {
+          console.warn(`[SecureStorage] Store '${storeName}' not found for retrieval, falling back to 'cache'`);
           actualStoreName = 'cache';
-          storedData = await getDataFromDB<{
-            data: string;
-            timestamp: number;
-            keyName: string;
-            sessionKey: boolean;
-          }>(actualStoreName, key);
+          retrievedData = await getDataFromDB<{data: string;timestamp: number;keyName: string;sessionKey: boolean;}>(actualStoreName, key);
+        } else if (retrieveError instanceof Error) {
+          throw retrieveError;
         } else {
-          throw storeError;
+          throw new Error(`Unknown error during retrieve operation: ${retrieveError}`);
         }
       }
 
-      if (!storedData?.data) {
-        console.log(`[SecureStorage] No data found for key: ${key}`);
+      if (!retrievedData || !retrievedData.data) {
+        console.log(`[SecureStorage] No data found for key: ${key} in store: ${actualStoreName}`);
         return null;
       }
 
-      // Use stored key preferences
-      const actualKeyName = storedData.keyName || keyName;
-      const actualSessionKey = storedData.sessionKey ?? sessionKey;
+      // Check keyName and sessionKey matching if they were stored
+      if (retrievedData.keyName !== keyName || retrievedData.sessionKey !== sessionKey) {
+        console.warn(`[SecureStorage] Key mismatch for ${key}. Stored with keyName: ${retrievedData.keyName}, sessionKey: ${retrievedData.sessionKey}. Requested with keyName: ${keyName}, sessionKey: ${sessionKey}. Returning null.`);
+        return null;
+      }
 
-      const decryptedData = await this.decryptData(
-        storedData.data,
-        actualKeyName,
-        actualSessionKey
-      );
+      // 1. Decrypt data
+      const decryptedData = await this.decryptData(retrievedData.data, keyName, sessionKey);
+      console.log(`[SecureStorage] Data decrypted, length: ${decryptedData.length}`);
 
-      console.log(`[SecureStorage] Data retrieved securely from '${actualStoreName}': ${key}`);
-      return JSON.parse(decryptedData);
-    } catch (error) {
-      console.error(`[SecureStorage] Failed to retrieve ${key}:`, error);
+      // 2. Deserialize data
+      const deserializedData: T = JSON.parse(decryptedData);
+      console.log(`[SecureStorage] Data deserialized for ${key}`);
+      return deserializedData;
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error(`[SecureStorage] Failed to retrieve ${key}:`, error.message);
+      } else {
+        console.error(`[SecureStorage] Failed to retrieve ${key}: Unknown error`, error);
+      }
       return null;
     }
   }
@@ -272,57 +284,54 @@ export class SecureStorage {
     options: SecureStorageOptions = {}
   ): Promise<void> {
     const { storeName = 'secureStorage' } = options;
-
     try {
-      // Try to remove from preferred store, then fallback
-      try {
-        await clearDataFromDB(storeName, key);
-        console.log(`[SecureStorage] Data removed securely from '${storeName}': ${key}`);
-      } catch (storeError) {
-        if (storeError.message?.includes('not found') && storeName === 'secureStorage') {
-          console.warn(`[SecureStorage] Store '${storeName}' not found, trying 'cache'`);
-          await clearDataFromDB('cache', key);
-          console.log(`[SecureStorage] Data removed securely from 'cache': ${key}`);
-        } else {
-          throw storeError;
-        }
+      console.log(`[SecureStorage] Attempting to remove: ${key} from store: ${storeName}`);
+      await clearDataFromDB(storeName, key);
+      console.log(`[SecureStorage] Data removed securely: ${key}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error(`[SecureStorage] Failed to remove ${key}:`, error.message);
+      } else {
+        console.error(`[SecureStorage] Failed to remove ${key}: Unknown error`, error);
       }
-    } catch (error) {
-      console.error(`[SecureStorage] Failed to remove ${key}:`, error);
-      // Don't throw error for missing data during cleanup
-      if (error.name === 'NotFoundError') {
-        console.warn(`[SecureStorage] Data '${key}' not found during removal, skipping`);
-        return;
-      }
-      throw error;
+      throw new Error(`SecureStorage removeItem failed: ${error}`);
     }
   }
 
   /**
-   * Clear all encryption keys (logout)
+   * Clear all secure keys and data from storage.
+   * This should be used cautiously as it will invalidate all secure items.
    */
   async clearAllKeys(): Promise<void> {
     try {
-      console.log('[SecureStorage] ⚠️ Clearing all encryption keys - this should only happen on logout');
-
-      // Clear memory cache
+      console.log('[SecureStorage] Clearing all secure keys...');
+      // Clear in-memory cache
       this.encryptionKeys.clear();
 
-      // Clear session storage keys
-      const sessionKeys = Object.keys(sessionStorage).filter(key => key.startsWith('secure_key_'));
-      sessionKeys.forEach(key => sessionStorage.removeItem(key));
+      // Clear from session/local storage
+      for (const key of Object.keys(sessionStorage)) {
+        if (key.startsWith('secure_key_')) {
+          sessionStorage.removeItem(key);
+        }
+      }
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith('secure_key_')) {
+          localStorage.removeItem(key);
+        }
+      }
 
-      // Clear localStorage keys (for persistent login)
-      const localKeys = Object.keys(localStorage).filter(key => key.startsWith('secure_key_'));
-      localKeys.forEach(key => localStorage.removeItem(key));
+      // Clear from IndexedDB stores (assuming 'secureStorage' and 'cache' are the main ones)
+      await clearDataFromDB('secureStorage');
+      await clearDataFromDB('cache');
 
-      console.log('[SecureStorage] All encryption keys cleared:', {
-        memoryKeys: 'cleared',
-        sessionKeys: sessionKeys.length,
-        localKeys: localKeys.length
-      });
-    } catch (error) {
-      console.error('[SecureStorage] Failed to clear keys:', error);
+      console.log('[SecureStorage] All secure keys cleared.');
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error('[SecureStorage] Error clearing all keys:', error.message);
+      } else {
+        console.error('[SecureStorage] Error clearing all keys: Unknown error', error);
+      }
+      throw new Error(`SecureStorage clearAllKeys failed: ${error}`);
     }
   }
 }

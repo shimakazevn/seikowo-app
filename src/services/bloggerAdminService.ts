@@ -8,7 +8,7 @@ export interface BloggerPost {
   title: string;
   content: string;
   labels?: string[];
-  status?: 'DRAFT' | 'LIVE' | 'SCHEDULED';
+  status: 'DRAFT' | 'LIVE' | 'SCHEDULED';
   published?: string;
   updated?: string;
   url?: string;
@@ -39,6 +39,15 @@ export interface BloggerPost {
   etag?: string;
   selfLink?: string;
   titleLink?: string;
+}
+
+export interface BloggerPostUserInfo {
+  post: BloggerPost;
+  blogId: string;
+  postId: string;
+  userId: string;
+  hasEditAccess?: boolean;
+  kind: string;
 }
 
 export interface CreatePostRequest {
@@ -73,29 +82,87 @@ export class BloggerAdminService {
   }
 
   private async getAuthHeaders(retryCount = 0): Promise<HeadersInit> {
-    // Check if user is authenticated first
-    const isAuthenticated = await authService.isAuthenticated();
-    if (!isAuthenticated) {
-      throw new Error('Auth token not found in response');
+    try {
+      // Check if user is authenticated first
+      const isAuthenticated = await authService.isAuthenticated();
+      if (!isAuthenticated) {
+        console.error('[BloggerAdmin] User is not authenticated');
+        throw new Error('Auth token not found in response');
+      }
+
+      // Get tokens directly from token manager
+      const tokens = await authService.tokenManager.getTokens();
+      if (!tokens?.accessToken) {
+        console.error('[BloggerAdmin] No access token available');
+        throw new Error('Auth token not found in response');
+      }
+
+      console.log('[BloggerAdmin] Using access token:', tokens.accessToken.substring(0, 20) + '...');
+
+      return {
+        'Authorization': `Bearer ${tokens.accessToken}`,
+        'Content-Type': 'application/json',
+      };
+    } catch (error) {
+      console.error('[BloggerAdmin] Error in getAuthHeaders:', error);
+      throw error;
     }
+  }
 
-    // Check if token is valid (this will auto-refresh if needed)
-    const isTokenValid = await authService.tokenManager.isTokenValid();
-    if (!isTokenValid) {
-      throw new Error('Auth token not found in response');
+  // Check if user has author access to the blog
+  private async checkUserRole(): Promise<boolean> {
+    try {
+      const tokens = await authService.tokenManager.getTokens();
+      if (!tokens?.accessToken) {
+        console.log('[BloggerAdmin] No access token available');
+        return false;
+      }
+
+      console.log('[BloggerAdmin] Checking user role for blog:', blogConfig.blogId);
+      
+      // Check user's role for this blog using self
+      const userRoleResponse = await fetch(
+        `${this.baseUrl}/users/self/blogs/${blogConfig.blogId}?view=AUTHOR`,
+        {
+          headers: {
+            'Authorization': `Bearer ${tokens.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!userRoleResponse.ok) {
+        const errorText = await userRoleResponse.text();
+        console.error('[BloggerAdmin] Failed to get user role:', {
+          status: userRoleResponse.status,
+          statusText: userRoleResponse.statusText,
+          error: errorText
+        });
+        return false;
+      }
+
+      const blogData = await userRoleResponse.json();
+      console.log('[BloggerAdmin] Blog info:', blogData);
+
+      // Check if user has author access
+      const role = blogData.blog_user_info?.role;
+      const hasAccess = role === 'ADMIN' || role === 'AUTHOR';
+      console.log('[BloggerAdmin] User access check result:', {
+        role,
+        hasAccess
+      });
+
+      return hasAccess;
+    } catch (error) {
+      console.error('[BloggerAdmin] Error checking user role:', error);
+      return false;
     }
+  }
 
-    const tokens = await authService.tokenManager.getTokens();
-    if (!tokens?.accessToken) {
-      throw new Error('Auth token not found in response');
-    }
-
-    console.log('[BloggerAdmin] Using access token:', tokens.accessToken.substring(0, 20) + '...');
-
-    return {
-      'Authorization': `Bearer ${tokens.accessToken}`,
-      'Content-Type': 'application/json',
-    };
+  // New public method to check author access
+  public async hasAuthorAccess(): Promise<boolean> {
+    const role = await this.getBloggerUserRole();
+    return role === 'ADMIN' || role === 'AUTHOR';
   }
 
   private async handleApiResponse<T>(response: Response): Promise<T> {
@@ -148,7 +215,15 @@ export class BloggerAdminService {
     try {
       console.log('[BloggerAdmin] Creating new post:', postData.title, 'Status:', postData.status);
 
+      // Check user permissions first
+      const hasAccess = await this.hasAuthorAccess();
+      if (!hasAccess) {
+        throw new Error('You do not have permission to create posts. Please make sure you are an admin or author.');
+      }
+
       const headers = await this.getAuthHeaders();
+      const currentUser = await authService.getCurrentUser();
+      const authorInfo = currentUser?.id ? { id: currentUser.id, displayName: currentUser.name || 'Unknown', url: '', image: { url: currentUser.picture || '' } } : undefined;
 
       // For draft posts, we need to use a different approach
       if (postData.status === 'DRAFT') {
@@ -163,6 +238,7 @@ export class BloggerAdminService {
           headers,
           body: JSON.stringify({
             ...postPayload,
+            author: authorInfo,
             // Don't include published date to keep it as draft
           }),
         });
@@ -184,20 +260,23 @@ export class BloggerAdminService {
 
         console.log('[BloggerAdmin] Draft post created successfully:', result.id);
         return result;
-      } else {
-        // For published posts, use normal creation
-        const url = `${this.baseUrl}/blogs/${blogConfig.blogId}/posts`;
-
-        const response = await fetch(url, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(postData),
-        });
-
-        const result = await this.handleApiResponse<BloggerPost>(response);
-        console.log('[BloggerAdmin] Published post created successfully:', result.id);
-        return result;
       }
+
+      // For published posts, use normal creation
+      const url = `${this.baseUrl}/blogs/${blogConfig.blogId}/posts`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+            ...postData,
+            author: authorInfo
+        }),
+      });
+
+      const result = await this.handleApiResponse<BloggerPost>(response);
+      console.log('[BloggerAdmin] Published post created successfully:', result.id);
+      return result;
     } catch (error) {
       console.error('[BloggerAdmin] Error creating post:', error);
       throw error;
@@ -209,7 +288,15 @@ export class BloggerAdminService {
     try {
       console.log('[BloggerAdmin] Creating draft post:', postData.title);
 
+      // Check user permissions first
+      const hasAccess = await this.hasAuthorAccess();
+      if (!hasAccess) {
+        throw new Error('You do not have permission to create posts. Please make sure you are an admin or author.');
+      }
+
       const headers = await this.getAuthHeaders();
+      const currentUser = await authService.getCurrentUser();
+      const authorInfo = currentUser?.id ? { id: currentUser.id, displayName: currentUser.name || 'Unknown', url: '', image: { url: currentUser.picture || '' } } : undefined;
 
       // Use the posts endpoint with isDraft parameter
       const url = `${this.baseUrl}/blogs/${blogConfig.blogId}/posts?isDraft=true`;
@@ -223,8 +310,8 @@ export class BloggerAdminService {
         title: postData.title || 'Untitled Post',
         content: postData.content || '<p>Content...</p>',
         labels: postData.labels || [],
+        author: authorInfo,
         // Explicitly don't set published date to keep as draft
-        // published: undefined, // This should keep it as draft
       };
 
       console.log('[BloggerAdmin] Sending draft payload:', draftPayload);
@@ -347,18 +434,18 @@ export class BloggerAdminService {
 
       const headers = await this.getAuthHeaders();
 
-      // First try with ADMIN view to get more details
-      let url = `${this.baseUrl}/blogs/${blogConfig.blogId}/posts/${postId}?view=ADMIN`;
+      // First try with AUTHOR view since we want to support both admin and author access
+      let url = `${this.baseUrl}/blogs/${blogConfig.blogId}/posts/${postId}?view=AUTHOR`;
 
-      console.log('[BloggerAdmin] Trying admin view endpoint:', url);
+      console.log('[BloggerAdmin] Trying author view endpoint:', url);
       let response = await fetch(url, {
         method: 'GET',
         headers,
       });
 
-      // If not found with admin view, try regular endpoint
+      // If not found with author view, try regular endpoint
       if (response.status === 404) {
-        console.log('[BloggerAdmin] Post not found with admin view, trying regular endpoint...');
+        console.log('[BloggerAdmin] Post not found with author view, trying regular endpoint...');
         url = `${this.baseUrl}/blogs/${blogConfig.blogId}/posts/${postId}`;
         response = await fetch(url, {
           method: 'GET',
@@ -371,8 +458,8 @@ export class BloggerAdminService {
         console.log('[BloggerAdmin] Post not found, searching in all posts...');
 
         try {
-          // Search in all posts with admin view
-          const allPostsUrl = `${this.baseUrl}/blogs/${blogConfig.blogId}/posts?maxResults=100&view=ADMIN`;
+          // Search in all posts with author view
+          const allPostsUrl = `${this.baseUrl}/blogs/${blogConfig.blogId}/posts?maxResults=100&view=AUTHOR`;
           const allPostsResponse = await fetch(allPostsUrl, { headers });
 
           if (allPostsResponse.ok) {
@@ -387,6 +474,9 @@ export class BloggerAdminService {
         } catch (searchError) {
           console.warn('[BloggerAdmin] Error searching in all posts:', searchError);
         }
+
+        // If we get here, the post was not found
+        throw new Error('Post not found. It may have been deleted or you may not have access to it.');
       }
 
       const result = await this.handleApiResponse<BloggerPost>(response);
@@ -398,32 +488,33 @@ export class BloggerAdminService {
     }
   }
 
-  // Get posts by status with admin view (includes more stats)
+  // Get posts by status with author view
   async getPostsByStatus(
     status: 'DRAFT' | 'LIVE',
     maxResults: number = 25,
     pageToken?: string
   ): Promise<BloggerApiResponse<BloggerPost>> {
     try {
-      console.log(`[BloggerAdmin] Fetching ${status.toLowerCase()} posts with admin view`);
-
+      console.log('[BloggerAdmin] Fetching', status, 'posts with author view');
       const headers = await this.getAuthHeaders();
-      let url = `${this.baseUrl}/blogs/${blogConfig.blogId}/posts?maxResults=${maxResults}&status=${status.toLowerCase()}&view=ADMIN`;
 
-      if (pageToken) {
-        url += `&pageToken=${pageToken}`;
+      // Check user role using Blogger API
+      const isAdmin = await this.checkUserRole();
+      if (!isAdmin) {
+        console.error('[BloggerAdmin] User does not have admin access');
+        throw new Error('You do not have access to this blog. Please make sure you are an admin or author.');
       }
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
-      });
+      const response = await fetch(
+        `${this.baseUrl}/blogs/${blogConfig.blogId}/posts?status=${status}&maxResults=${maxResults}${pageToken ? `&pageToken=${pageToken}` : ''}&view=AUTHOR`,
+        {
+          headers,
+        }
+      );
 
-      const result = await this.handleApiResponse<BloggerApiResponse<BloggerPost>>(response);
-      console.log(`[BloggerAdmin] ${status} posts fetched:`, result.items?.length || 0);
-      return result;
+      return await this.handleApiResponse<BloggerApiResponse<BloggerPost>>(response);
     } catch (error) {
-      console.error(`[BloggerAdmin] Error fetching ${status} posts:`, error);
+      console.error('[BloggerAdmin] Error fetching', status, 'posts:', error);
       throw error;
     }
   }
@@ -431,52 +522,70 @@ export class BloggerAdminService {
   // Get all posts including drafts for admin (alternative approach)
   async getAllPostsIncludingDrafts(maxResults: number = 20): Promise<BloggerPost[]> {
     try {
-      console.log('[BloggerAdmin] Fetching all posts including drafts...');
-
       const headers = await this.getAuthHeaders();
 
-      // Fetch live posts
-      console.log('[BloggerAdmin] Fetching live posts...');
-      const liveUrl = `${this.baseUrl}/blogs/${blogConfig.blogId}/posts?maxResults=${maxResults}&view=ADMIN&status=live&fetchBodies=false`;
-      const liveResponse = await fetch(liveUrl, { headers });
+      // Get current user info for logging
+      const currentUser = await authService.getCurrentUser();
+      const googleUserId = currentUser?.id;
+      const bloggerUserId = '09031960469049044469'; // Your Blogger ID
+
+      console.log('[BloggerAdmin] Fetching posts for user:', {
+        googleUserId,
+        bloggerUserId,
+        name: currentUser?.name
+      });
+
+      // Fetch both live and draft posts
+      const [liveResponse, draftResponse] = await Promise.all([
+        fetch(`${this.baseUrl}/blogs/${blogConfig.blogId}/posts?maxResults=${maxResults}&status=live&fetchBodies=false`, { headers }),
+        fetch(`${this.baseUrl}/blogs/${blogConfig.blogId}/posts?maxResults=${maxResults}&status=draft&fetchBodies=false`, { headers })
+      ]);
 
       if (!liveResponse.ok) {
-        console.error('[BloggerAdmin] Live posts fetch failed:', liveResponse.status, liveResponse.statusText);
+        console.error(`[BloggerAdmin] Failed to fetch live posts: ${liveResponse.status} ${liveResponse.statusText}`);
       }
-
-      const liveData = await this.handleApiResponse<{ items?: BloggerPost[] }>(liveResponse);
-
-      // Fetch draft posts
-      console.log('[BloggerAdmin] Fetching draft posts...');
-      const draftUrl = `${this.baseUrl}/blogs/${blogConfig.blogId}/posts?maxResults=${maxResults}&view=ADMIN&status=draft&fetchBodies=false`;
-      const draftResponse = await fetch(draftUrl, { headers });
-
       if (!draftResponse.ok) {
-        console.error('[BloggerAdmin] Draft posts fetch failed:', draftResponse.status, draftResponse.statusText);
+        console.error(`[BloggerAdmin] Failed to fetch draft posts: ${draftResponse.status} ${draftResponse.statusText}`);
       }
 
-      const draftData = await this.handleApiResponse<{ items?: BloggerPost[] }>(draftResponse);
+      const [liveData, draftData] = await Promise.all([
+        this.handleApiResponse<{ items?: BloggerPost[] }>(liveResponse),
+        this.handleApiResponse<{ items?: BloggerPost[] }>(draftResponse)
+      ]);
 
-      // Combine and sort by updated date
+      // Combine all posts
       const allPosts = [
         ...(liveData.items || []),
         ...(draftData.items || [])
-      ].sort((a, b) => {
+      ];
+
+      // Filter posts by author ID
+      const userPosts = allPosts.filter(post => {
+        const isAuthor = post.author?.id === googleUserId || post.author?.id === bloggerUserId;
+        if (!isAuthor) {
+          console.log(`[BloggerAdmin] Filtering out post: "${post.title}" (Author ID: ${post.author?.id})`);
+        }
+        return isAuthor;
+      });
+
+      // Sort by updated date
+      userPosts.sort((a, b) => {
         const dateA = new Date(a.updated || a.published || 0).getTime();
         const dateB = new Date(b.updated || b.published || 0).getTime();
         return dateB - dateA; // Most recent first
       });
 
-      console.log('[BloggerAdmin] All posts fetched successfully:', {
-        live: liveData.items?.length || 0,
-        draft: draftData.items?.length || 0,
-        total: allPosts.length,
-        posts: allPosts.map(p => ({ title: p.title, status: p.status, id: p.id }))
+      // Log summary
+      console.log('[BloggerAdmin] Posts summary:', {
+        total: userPosts.length,
+        live: userPosts.filter(p => p.status === 'LIVE').length,
+        draft: userPosts.filter(p => p.status === 'DRAFT').length,
+        filteredOut: allPosts.length - userPosts.length
       });
 
-      return allPosts;
+      return userPosts;
     } catch (error: any) {
-      console.error('[BloggerAdmin] Error fetching all posts including drafts:', error);
+      console.error('[BloggerAdmin] Error fetching posts:', error.message);
 
       // Provide more specific error information
       if (error.message?.includes('401')) {
@@ -494,36 +603,53 @@ export class BloggerAdminService {
   // Get all posts for admin management with pagination
   async getAllPosts(maxResults: number = 20, pageToken?: string, retryCount = 0): Promise<BloggerApiResponse<BloggerPost>> {
     try {
-      console.log('[BloggerAdmin] Fetching all posts for admin', { maxResults, pageToken, retryCount });
-
       const headers = await this.getAuthHeaders();
 
-      // Fetch all posts including drafts for admin management
-      let url = `${this.baseUrl}/blogs/${blogConfig.blogId}/posts?maxResults=${maxResults}&view=ADMIN&fetchBodies=false&status=live,draft`;
-
-      if (pageToken) {
-        url += `&pageToken=${pageToken}`;
+      // Get current user ID
+      const currentUser = await authService.getCurrentUser();
+      if (!currentUser?.id) {
+        throw new Error('User ID not found. Cannot fetch user-specific posts.');
       }
+      const userId = currentUser.id;
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
+      // Fetch live posts for the specific user
+      let liveUrl = `${this.baseUrl}/blogs/${blogConfig.blogId}/posts?maxResults=${maxResults}&view=AUTHOR&fetchBodies=false&status=live`;
+      if (pageToken) {
+        liveUrl += `&pageToken=${pageToken}`;
+      }
+      const liveResponse = await fetch(liveUrl, { method: 'GET', headers });
+      const liveResult = await this.handleApiResponse<BloggerApiResponse<BloggerPost>>(liveResponse);
+
+      // Fetch draft posts for the specific user
+      let draftUrl = `${this.baseUrl}/blogs/${blogConfig.blogId}/posts?maxResults=${maxResults}&view=AUTHOR&fetchBodies=false&status=draft`;
+      if (pageToken) {
+        draftUrl += `&pageToken=${pageToken}`;
+      }
+      const draftResponse = await fetch(draftUrl, { method: 'GET', headers });
+      const draftResult = await this.handleApiResponse<BloggerApiResponse<BloggerPost>>(draftResponse);
+
+      // Combine results
+      const combinedItems = [...(liveResult.items || []), ...(draftResult.items || [])];
+      
+      // Filter posts to only include those authored by the current user
+      const userPosts = combinedItems.filter(post => post.author?.id === userId);
+
+      // Log summary
+      console.log('[BloggerAdmin] Posts summary:', {
+        live: liveResult.items?.length || 0,
+        draft: draftResult.items?.length || 0,
+        filtered: userPosts.length
       });
 
-      const result = await this.handleApiResponse<BloggerApiResponse<BloggerPost>>(response);
+      // Determine next page token
+      const nextToken = liveResult.nextPageToken || draftResult.nextPageToken || undefined;
 
-      console.log('[BloggerAdmin] Posts fetched successfully:', {
-        count: result.items?.length || 0,
-        hasNextPage: !!result.nextPageToken
-      });
-
-      return result;
+      return { ...liveResult, items: userPosts, nextPageToken: nextToken };
     } catch (error: any) {
-      console.error('[BloggerAdmin] Error fetching posts:', error);
+      console.error('[BloggerAdmin] Error fetching posts:', error.message);
 
       // Retry once if token was refreshed
       if (error.message === 'TOKEN_REFRESHED' && retryCount === 0) {
-        console.log('[BloggerAdmin] Retrying getAllPosts after token refresh...');
         return this.getAllPosts(maxResults, pageToken, retryCount + 1);
       }
 
@@ -599,7 +725,56 @@ export class BloggerAdminService {
 
   // Image upload functionality removed
 
+  public async getBloggerUserRole(): Promise<'ADMIN' | 'AUTHOR' | 'READER' | 'NONE'> {
+    try {
+      console.log('[BloggerAdmin] Getting user role from Blogger API...');
+      const tokens = await authService.tokenManager.getTokens();
+      if (!tokens?.accessToken) {
+        console.log('[BloggerAdmin] No access token available for role check');
+        return 'NONE';
+      }
 
+      const userRoleResponse = await fetch(
+        `${this.baseUrl}/users/self/blogs/${blogConfig.blogId}?view=AUTHOR`,
+        {
+          headers: {
+            'Authorization': `Bearer ${tokens.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!userRoleResponse.ok) {
+        // If 404, blog not found or user has no access, consider it 'NONE'
+        if (userRoleResponse.status === 404 || userRoleResponse.status === 403) {
+          console.log('[BloggerAdmin] Blog not found or access denied for role check. Status:', userRoleResponse.status);
+          return 'NONE';
+        }
+
+        const errorText = await userRoleResponse.text();
+        console.error('[BloggerAdmin] Failed to get user role (API error):', {
+          status: userRoleResponse.status,
+          statusText: userRoleResponse.statusText,
+          error: errorText
+        });
+        return 'NONE';
+      }
+
+      const blogData = await userRoleResponse.json();
+      const role = blogData.blog_user_info?.role as 'ADMIN' | 'AUTHOR' | 'READER' | undefined;
+
+      if (role) {
+        console.log('[BloggerAdmin] User role found:', role);
+        return role;
+      } else {
+        console.log('[BloggerAdmin] No specific role found for user, defaulting to READER');
+        return 'READER'; // Default to READER if no explicit role is returned
+      }
+    } catch (error) {
+      console.error('[BloggerAdmin] Error getting Blogger user role:', error);
+      return 'NONE';
+    }
+  }
 }
 
 // Export singleton instance

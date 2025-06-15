@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Box,
@@ -13,15 +13,17 @@ import { usePostData } from '../hooks/usePostData';
 import { useMangaDetection } from '../hooks/useMangaDetection';
 import { usePostNavigation } from '../hooks/usePostNavigation';
 import { ErrorAlert, NotFoundAlert } from '../components/PostPage/ErrorAlert';
-import { PageLoader } from '../components/PostPage/PageLoader';
-import EnhancedPostHeader from '../components/PostPage/EnhancedPostHeader';
-import EnhancedPostContent from '../components/PostPage/EnhancedPostContent';
-import EnhancedPostSidebar from '../components/PostPage/EnhancedPostSidebar';
-import EnhancedMangaPostPage from '../components/PostPage/EnhancedMangaPostPage';
+import PostHeader from '../components/PostPage/PostView/Header';
+import PostView from '../components/PostPage/PostView';
+import PostSidebar from '../components/PostPage/PostView/Sidebar';
+import MangaView from '../components/PostPage/MangaView';
 import BackgroundPattern from '../components/BackgroundPattern';
 import useUserStore from '../store/useUserStore';
 import useFavoriteBookmarkStore from '../store/useFollowBookmarkStore';
 import { Post, PostContentProps } from '../types/post';
+import PageLoader from '../components/layout/PageLoader';
+import NativeBloggerComments from '../components/features/Comments/NativeBloggerComments';
+import { blogConfig } from '../config';
 
 const PostContent: React.FC<PostContentProps> = ({ post }) => {
   const realPost = post?.data ? post.data : post;
@@ -37,17 +39,8 @@ const PostContent: React.FC<PostContentProps> = ({ post }) => {
     showToast
   } = usePostNavigation();
 
-  // Initialize store
-  useEffect(() => {
-    if (userId && isAuthenticated) {
-      initializeStore(userId);
-    }
-  }, [userId, isAuthenticated, initializeStore]);
-
-  // Early return if no valid post data
-  if (!realPost || !realPost.title) {
-    return <NotFoundAlert />;
-  }
+  const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
 
   const {
     mangaImages,
@@ -55,7 +48,53 @@ const PostContent: React.FC<PostContentProps> = ({ post }) => {
     hasDetectedManga,
     getCoverImage,
     extractLanguage
-  } = useMangaDetection(realPost);
+  } = useMangaDetection(realPost || {});
+
+  // const preloadImages = useCallback((startIndex: number, count: number = 3) => {
+  //   if (!mangaImages?.length) return;
+    
+  //   const newLoadedImages = new Set(loadedImages);
+  //   let hasNewImages = false;
+    
+  //   // Preload next few images
+  //   for (let i = 0; i < count; i++) {
+  //     const index = startIndex + i;
+  //     if (index >= 0 && index < mangaImages.length && !loadedImages.has(index)) {
+  //       const img = new Image();
+  //       img.src = mangaImages[index];
+  //       newLoadedImages.add(index);
+  //       hasNewImages = true;
+  //     }
+  //   }
+    
+  //   // Only update state if we actually loaded new images
+  //   if (hasNewImages) {
+  //     setLoadedImages(newLoadedImages);
+  //   }
+  // }, [mangaImages, loadedImages]);
+
+  // Initialize store
+  useEffect(() => {
+    if (userId && isAuthenticated) {
+      initializeStore(userId);
+    }
+  }, [userId, isAuthenticated, initializeStore]);
+
+  // Load current page and preload next pages
+  // useEffect(() => {
+  //   if (mangaImages?.length > 0) {
+  //     // Load current page
+  //     preloadImages(currentPage, 1);
+      
+  //     // Preload next 2 pages
+  //     preloadImages(currentPage + 1, 2);
+  //   }
+  // }, [currentPage, mangaImages, preloadImages]);
+
+  // Early return if no valid post data
+  if (!realPost || !realPost.title) {
+    return <NotFoundAlert />;
+  }
 
   // Render nothing or a loader until manga detection is complete
   if (!hasDetectedManga) {
@@ -96,7 +135,7 @@ const PostContent: React.FC<PostContentProps> = ({ post }) => {
 
   if (isMangaPost) {
     return (
-      <EnhancedMangaPostPage
+      <MangaView
         title={realPost.title}
         coverImage={getCoverImage()}
         images={mangaImages}
@@ -125,7 +164,7 @@ const PostContent: React.FC<PostContentProps> = ({ post }) => {
         {/* Main Content Column */}
         <GridItem>
           <VStack spacing={8} align="stretch">
-            <EnhancedPostHeader
+            <PostHeader
               title={realPost.title || 'Untitled'}
               publishedDate={realPost.published}
               author="Admin"
@@ -133,7 +172,7 @@ const PostContent: React.FC<PostContentProps> = ({ post }) => {
               onTagSelect={handleTagSelect}
             />
 
-            <EnhancedPostContent
+            <PostView
               content={realPost.content || ''}
             />
 
@@ -159,7 +198,7 @@ const PostContent: React.FC<PostContentProps> = ({ post }) => {
 
         {/* Sidebar Column */}
         <GridItem display={{ base: 'none', xl: 'block' }}>
-          <EnhancedPostSidebar
+          <PostSidebar
             stats={{
               likes: Math.floor(Math.random() * 500) + 50,
               comments: Math.floor(Math.random() * 100) + 10,
@@ -196,7 +235,18 @@ const PostPage: React.FC = () => {
         ) : !post ? (
           <NotFoundAlert />
         ) : (
-          <PostContent post={post} />
+          <>
+            <PostContent post={post} />
+            {/* Comments Section - Mobile Optimized */}
+            <Box >
+              <Box p={{ base: 2, md: 4 }}>
+                <NativeBloggerComments
+                  postId={post?.id || ''}
+                  blogId={blogConfig.blogId}
+                />
+              </Box>
+            </Box>
+          </>
         )}
       </Box>
     </Container>

@@ -65,6 +65,12 @@ export interface MangaBookmark {
   timestamp: number;
   totalPages?: number;
   verticalMode?: boolean;
+  bookmarkId?: string;
+}
+
+export interface ReadPost {
+  id: string;
+  readAt: number;
 }
 
 export interface FollowedPost {
@@ -118,6 +124,9 @@ export interface UserData {
   lastSyncTime: number | null;
   syncStatus: 'idle' | 'loading' | 'success' | 'error';
   updatedAt?: string;
+  favoritePosts?: FavoritePost[];
+  mangaBookmarks?: MangaBookmark[];
+  readPosts?: ReadPost[];
 }
 
 export interface UserInfo {
@@ -189,10 +198,6 @@ export interface RssItem {
   categories: string[];
   content?: string;
   thumbnail?: string;
-  enclosure?: {
-    link: string;
-    type: string;
-  };
 }
 
 export interface RssFeed {
@@ -290,4 +295,22 @@ export interface DesktopNavProps {
   isActive: (path: string) => boolean;
   activeColor: string;
   textColor: string;
+}
+
+export interface UserDashboardTab {
+  id: string;
+  label: string;
+  icon: any;
+  description: string;
+  color: string;
+  component: React.ComponentType<{
+    cardBg: string;
+    textColor: string;
+    mutedColor: string;
+    accentColor: string;
+    isDark: boolean;
+    favoritesPosts?: FavoritePost[];
+    bookmarkedPosts?: MangaBookmark[];
+    bloggerUserRole?: 'ADMIN' | 'AUTHOR' | 'READER' | 'NONE' | null;
+  }>;
 }

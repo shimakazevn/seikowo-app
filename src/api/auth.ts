@@ -297,19 +297,17 @@ export const handleLogout = async (params: LogoutParams): Promise<void> => {
 };
 
 // Refresh token (still needed, but getValidAccessToken calls it)
-export const refreshToken = async (refreshTokenValue: string): Promise<string> => {
+export const refreshToken = async (refreshTokenValue: string): Promise<{ accessToken: string; expiresIn: number; } | null> => {
+  console.log('[auth.ts] Attempting to refresh token...');
   try {
-    console.log('[refreshToken] Starting token refresh process...');
-    console.log('[refreshToken] Using refresh token:', refreshTokenValue.substring(0, 10) + '...');
-    
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        client_id: blogConfig.clientId || '',
-        client_secret: blogConfig.clientSecret || '',
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
+        client_secret: import.meta.env.VITE_GOOGLE_CLIENT_SECRET || '',
         refresh_token: refreshTokenValue,
         grant_type: 'refresh_token',
       }).toString(),
@@ -317,30 +315,36 @@ export const refreshToken = async (refreshTokenValue: string): Promise<string> =
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('[refreshToken] Error refreshing token:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorData
-      });
-      throw new Error(errorData.error_description || 'Failed to refresh token');
+      console.error('[auth.ts] Failed to refresh token:', response.status, response.statusText, errorData);
+      if (errorData.error === 'invalid_grant') {
+        throw new Error('invalid_grant'); // Indicates refresh token is no longer valid
+      }
+      throw new Error(`Failed to refresh token: ${response.statusText || response.status}`);
     }
 
     const data = await response.json();
-    console.log('[refreshToken] Token refresh response:', {
-      hasAccessToken: !!data.access_token,
-      expiresIn: data.expires_in,
-      tokenType: data.token_type,
-      scope: data.scope
-    });
+    const newAccessToken = data.access_token;
+    const expiresIn = data.expires_in; // Time in seconds
 
-    if (!data.access_token) {
-      throw new Error('No new access token in refresh response');
+    if (!newAccessToken) {
+      console.error('[auth.ts] Refresh token response missing access token.');
+      return null;
     }
 
-    console.log('[refreshToken] Token refresh successful');
-    return data.access_token;
+    // Store the new refresh token if provided (often not on refresh token flow)
+    if (data.refresh_token) {
+      await setRefreshToken(data.refresh_token);
+    }
+
+    console.log('[auth.ts] Token refreshed successfully. New token expires in:', expiresIn, 'seconds.');
+    return { accessToken: newAccessToken, expiresIn };
   } catch (error: any) {
-    console.error('[refreshToken] Token refresh failed:', error);
+    console.error('[auth.ts] Error during token refresh:', error);
+    // If it's an invalid_grant error, clear all tokens to force re-authentication
+    if (error.message === 'invalid_grant') {
+      console.error('[auth.ts] Invalid refresh token detected, clearing all tokens.');
+      await clearTokens();
+    }
     throw error;
   }
 };

@@ -220,30 +220,36 @@ const TOKEN_VALIDATION_DURATION = 3600000; // 1 giờ
  * @param params - URL parameters
  * @returns The URL to fetch from
  */
-function getBloggerApiUrl(endpoint: string, params: Record<string, string | number> = {}): string {
+export function getBloggerApiUrl(endpoint: string, params: Record<string, string | number> = {}): string {
   const isDev = import.meta.env.DEV;
-  const baseUrl = 'https://www.googleapis.com/blogger/v3';
+  const baseUrl = 'https://www.googleapis.com';
   
-  // Build target URL
-  const url = new URL(endpoint, baseUrl);
+  // Ensure endpoint starts with a slash
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  
+  // Remove /blogger/v3 if it exists in the endpoint since we'll add it back
+  const endpointWithoutVersion = cleanEndpoint.replace('/blogger/v3', '');
+  
+  // Construct the full URL with /blogger/v3
+  const targetUrl = new URL(`/blogger/v3${endpointWithoutVersion}`, baseUrl).toString();
   
   // Add parameters
+  const url = new URL(targetUrl);
   Object.entries(params).forEach(([key, value]) => {
     url.searchParams.set(key, value.toString());
   });
   
-  const targetUrl = url.toString();
+  const finalUrl = url.toString();
   if (isDev) {
     // Development: Use Vite proxy
-    // Chỉ encode URL một lần để tránh double encoding
-    const proxyUrl = `/api/blogger?url=${encodeURIComponent(targetUrl)}`;
-    console.log('[getBloggerApiUrl] Original URL:', targetUrl);
+    const proxyUrl = `/api/blogger?url=${encodeURIComponent(finalUrl)}`;
+    console.log('[getBloggerApiUrl] Original URL:', finalUrl);
     console.log('[getBloggerApiUrl] Proxy URL:', proxyUrl);
     return proxyUrl;
   }
   
   // Production: Direct API call
-  return targetUrl;
+  return finalUrl;
 }
 
 export async function fetchWithAuth(url: string, options?: FetchWithAuthOptions): Promise<Response> {

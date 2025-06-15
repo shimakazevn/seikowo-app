@@ -2,7 +2,6 @@ import React, { memo } from 'react';
 import {
   Modal,
   ModalOverlay,
-  ModalContent,
   ModalHeader,
   ModalCloseButton,
   ModalBody,
@@ -18,6 +17,7 @@ import { ConfirmClearDataModal } from './ConfirmClearDataModal';
 import { useUserDataManagement } from '../../hooks/useUserDataManagement';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import { useDisclosure } from '@chakra-ui/react';
+import { AppModal } from '../../components/common/AppModal';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -52,14 +52,15 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
         preserveScrollBarGap={false}
       >
         <ModalOverlay backdropFilter="blur(10px)" />
-        <ModalContent
-          backdropFilter="blur(30px)"
-          bg={useColorModeValue("rgba(255, 255, 255, 0.48)", "rgba(26, 32, 44, 0.48)")}
-          borderRadius="xl"
-          boxShadow="xl"
-          maxW="800px"
-          mx={4}
-          maxH="80vh"
+        <AppModal
+          contentMaxW="800px"
+          contentMaxH="80vh"
+          contentBorderRadius="xl"
+          contentBoxShadow="xl"
+          contentP={0}
+          isOpen={true}
+          onClose={() => {}}
+          contentBg={useColorModeValue("rgba(255, 255, 255, 0.48)", "rgba(26, 32, 44, 0.48)")}
           onClick={(e) => e.stopPropagation()}
         >
           <ModalHeader>Cài đặt</ModalHeader>
@@ -79,7 +80,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
               </Box>
             </VStack>
           </ModalBody>
-        </ModalContent>
+        </AppModal>
       </Modal>
 
       <ConfirmClearDataModal

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { blogConfig } from '../config';
 import { fetchPages } from '../api';
+import LazyImage from '../components/ui/common/LazyImage';
 
 interface PageData {
   id: string;
@@ -57,11 +58,13 @@ const PagesList: React.FC = () => {
               <Link to={linkPath} className="text-decoration-none text-dark">
                 <div className="card h-100 shadow-sm">
                   {thumbnail && (
-                    <img
+                    <LazyImage
                       src={thumbnail}
                       alt={page.title}
-                      className="card-img-top"
-                      style={{ height: 200, objectFit: 'cover' }}
+                      width="100%"
+                      height="200px"
+                      objectFit="cover"
+                      borderRadius="md"
                     />
                   )}
                   <div className="card-body d-flex flex-column">

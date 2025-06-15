@@ -26,11 +26,13 @@ import {
   MdRefresh,
   MdContentCopy,
   MdVisibility,
-  MdVisibilityOff
+  MdVisibilityOff,
+  MdEdit
 } from 'react-icons/md';
 import { User } from '../../../types';
 import { useAuth } from '../../../hooks/useAuthNew';
 import LoginButton from '../../features/Auth/LoginButton';
+import { useNavigate } from 'react-router-dom';
 
 interface ProfileSettingsTabProps {
   isAuthenticated: boolean;
@@ -43,6 +45,7 @@ interface ProfileSettingsTabProps {
   onLogoutOpen: () => void;
   onDeleteOpen: () => void;
   onDeleteDriveBackupOpen: () => void;
+  bloggerUserRole?: 'ADMIN' | 'AUTHOR' | 'READER' | 'NONE' | null;
 }
 
 const ProfileSettingsTab: React.FC<ProfileSettingsTabProps> = ({
@@ -55,12 +58,14 @@ const ProfileSettingsTab: React.FC<ProfileSettingsTabProps> = ({
   handleExportData,
   onLogoutOpen,
   onDeleteOpen,
-  onDeleteDriveBackupOpen
+  onDeleteDriveBackupOpen,
+  bloggerUserRole
 }) => {
   // Local state
   const [showEmail, setShowEmail] = useState(false);
   const toast = useToast();
   const { login, isLoading: isAuthLoading } = useAuth();
+  const navigate = useNavigate();
 
   // Color mode values
   const textColor = useColorModeValue('#1a202c', '#ffffff');
@@ -276,55 +281,30 @@ const ProfileSettingsTab: React.FC<ProfileSettingsTabProps> = ({
                 variant="outline"
                 onClick={onDeleteOpen}
               >
-                xóa dữ liệu cục bộ
+                xóa dữ liệu
               </Button>
-              {isAuthenticated && (
-                <Button
-                  leftIcon={<MdDelete />}
-                  colorScheme="red"
-                  variant="outline"
-                  onClick={onDeleteDriveBackupOpen}
-                >
-                  xóa bản sao lưu trên drive
-                </Button>
-              )}
             </VStack>
           </Box>
 
           <Divider />
 
-          {/* Security Actions - Mobile Optimized */}
-          <Box>
-            <Heading size="sm" color={textColor} mb={4} fontWeight="600">
-              bảo mật & quyền riêng tư
-            </Heading>
-
-            <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={3}>
+          {/* Posts Management - Mobile Optimized */}
+          {(bloggerUserRole === 'ADMIN' || bloggerUserRole === 'AUTHOR') && (
+            <Box>
+              <Heading size="sm" color={textColor} mb={4} fontWeight="600">
+                quản lý bài viết
+              </Heading>
               <Button
-                leftIcon={<MdLogout />}
-                onClick={onLogoutOpen}
-                colorScheme="orange"
-                variant="ghost"
-                size="sm"
-                justifyContent="flex-start"
-                fontWeight="500"
+                leftIcon={<MdEdit />}
+                colorScheme="blue"
+                variant="outline"
+                onClick={() => navigate('/user/posts')}
+                w="100%"
               >
-                đăng xuất
+                quản lý bài viết
               </Button>
-
-              <Button
-                leftIcon={<MdDelete />}
-                onClick={onDeleteOpen}
-                colorScheme="red"
-                variant="ghost"
-                size="sm"
-                justifyContent="flex-start"
-                fontWeight="500"
-              >
-                xóa dữ liệu
-              </Button>
-            </SimpleGrid>
-          </Box>
+            </Box>
+          )}
         </VStack>
       </Box>
 
@@ -449,16 +429,6 @@ const ProfileSettingsTab: React.FC<ProfileSettingsTabProps> = ({
                 >
                   xóa dữ liệu
                 </Button>
-                {isAuthenticated && (
-                  <Button
-                    leftIcon={<MdDelete />}
-                    colorScheme="red"
-                    variant="outline"
-                    onClick={onDeleteDriveBackupOpen}
-                  >
-                    xóa bản sao lưu trên drive
-                  </Button>
-                )}
               </HStack>
             </VStack>
           </HStack>

@@ -141,6 +141,7 @@ const BottomNav: React.FC<BottomNavProps> = memo(({
                 alignItems="center"
                 justifyContent="center"
                 minH="24px"
+                filter={isDark ? 'drop-shadow(0 0 8px rgba(0,0,0,0.7))': 'drop-shadow(0 0 8px rgba(255,255,255,0.7))'}
               >
                 {item.icon}
               </Box>
@@ -152,6 +153,7 @@ const BottomNav: React.FC<BottomNavProps> = memo(({
                 textTransform="lowercase"
                 whiteSpace="nowrap"
                 opacity={isActive(item.path) ? 1 : 0.8}
+                textShadow={isDark ? '0 0 8px rgba(0,0,0,0.7), 0 0 5px rgba(0,0,0,0.5)' : '0 0 8px rgba(255,255,255,0.7), 0 0 5px rgba(255,255,255,0.5)'}
               >
                 {item.name}
               </Text>

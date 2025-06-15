@@ -2,8 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Box, Text, Skeleton, useColorModeValue, Tag, useColorMode } from '@chakra-ui/react';
 import { extractImage, optimizeThumbnail, getSlugFromUrl } from '../../utils/blogUtils';
-import { LazyLoadImage } from 'react-lazy-load-image-component';
-import 'react-lazy-load-image-component/src/effects/opacity.css';
+import LazyImage from '../ui/common/LazyImage';
 // Removed IndexedDB dependency - using only cache service now
 
 // Using theme secondary colors for consistent design
@@ -34,8 +33,6 @@ const PostCard: React.FC<PostCardProps> = ({ post, textColor, mutedTextColor, ex
   // Use simple thumbnail logic
   const thumbnail = post.thumbnail || (post.content ? extractImage(post.content) : null);
 
-
-
   // Dynamic colors based on theme - using secondary colors
   const { colorMode } = useColorMode();
   const isDark = colorMode === 'dark';
@@ -50,6 +47,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, textColor, mutedTextColor, ex
     : 'linear-gradient(to top, rgba(244,244,244,0.95) 0%, rgba(244,244,244,0.0) 100%)'; // Updated to use #f4f4f4
 
   const thumb400 = thumbnail ? optimizeThumbnail(thumbnail, 400) : undefined;
+  console.log("PostCard LazyImage src:", thumb400 || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjkwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGFsaWdubWVudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZmlsbD0iIzY2NiI+Tm8gSW1hZ2U8L2RldHQuPjwvc3ZnPg==');
 
   return (
     <Box
@@ -92,28 +90,16 @@ const PostCard: React.FC<PostCardProps> = ({ post, textColor, mutedTextColor, ex
             borderTopRightRadius="2xl"
             overflow="hidden"
           >
-            {!thumb400 && (
+            {/* {!thumb400 && (
               <Skeleton width="100%" height="100%" borderTopLeftRadius="2xl" borderTopRightRadius="2xl" />
-            )}
-            <LazyLoadImage
-              src={thumb400 || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjkwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGFsaWdubWVudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZmlsbD0iIzY2NiI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+'}
+            )} */}
+            <LazyImage
+              src={thumb400 || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjkwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGFsaWdubWVudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZmlsbD0iIzY2NiI+Tm8gSW1hZ2U8L2RldHQuPjwvc3ZnPg=='}
               alt={post.title}
               width="100%"
-              height="100%"
-              effect="opacity"
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'fill',
-                objectPosition: 'center top',
-                borderTopLeftRadius: '1rem',
-                borderTopRightRadius: '1rem',
-                borderBottomLeftRadius: 0,
-                borderBottomRightRadius: 0,
-              }}
+              objectFit="cover"
+              borderRadius="lg"
+              boxShadow="md"
             />
             {post.labels && post.labels[0] && (
               <Tag

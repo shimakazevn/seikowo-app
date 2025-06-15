@@ -18,6 +18,7 @@ import {
   Divider
 } from '@chakra-ui/react';
 import LoginButton from './LoginButton';
+import { AppModal } from '../../common/AppModal';
 
 interface LoginNotificationModalProps {
   isOpen: boolean;
@@ -55,82 +56,73 @@ const LoginNotificationModal: React.FC<LoginNotificationModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} isCentered>
-      <ModalOverlay backdropFilter="blur(4px)" />
-      <ModalContent
-        bg={bgColor}
-        borderWidth="1px"
-        borderColor={borderColor}
-        borderRadius="lg"
-        boxShadow="xl"
-      >
-        <ModalHeader textAlign="center" pb={2}>
-                {title}
-        </ModalHeader>
-        <ModalCloseButton />
-        <ModalBody pb={6}>
-          <VStack spacing={6} align="stretch">
-            {/* Feature Icon */}
-            {feature && (
-              <Box textAlign="center">
-                <Icon 
-                  as={feature === 'security' ? MdSecurity : MdVerifiedUser}
-                  w={12}
-                  h={12}
-                  color="blue.500"
-                />
-              </Box>
-            )}
-
-            {/* Message */}
-            <Text textAlign="center" color={textColor}>
-                    {message}
-                  </Text>
-
-            <Divider />
-
-            {/* Login Options */}
-            <VStack spacing={4}>
-              <LoginButton
-                variant="google"
-                size="md"
-                width="200px"
-                useGoogleIcon={true}
-                onSuccess={onClose}
-                onError={(error) => console.error('Login error in modal:', error)}
+    <AppModal isOpen={isOpen} onClose={onClose} isCentered>
+      <ModalHeader textAlign="center" pb={2}>
+        {title}
+      </ModalHeader>
+      <ModalCloseButton />
+      <ModalBody pb={6}>
+        <VStack spacing={6} align="stretch">
+          {/* Feature Icon */}
+          {feature && (
+            <Box textAlign="center">
+              <Icon 
+                as={feature === 'security' ? MdSecurity : MdVerifiedUser}
+                w={12}
+                h={12}
+                color="blue.500"
               />
+            </Box>
+          )}
 
-              <Button
-                variant="outline"
-                onClick={onClose}
-                size="sm"
-                w="full"
-                leftIcon={<FaSignInAlt />}
-              >
-                Quay lại
-              </Button>
-                </VStack>
+          {/* Message */}
+          <Text textAlign="center">
+            {message}
+          </Text>
 
-            {/* Benefits */}
-            <VStack spacing={3} align="stretch" pt={2}>
-              <Text fontSize="sm" fontWeight="medium" color={textColor}>
-                Lợi ích khi đăng nhập:
-              </Text>
-              <VStack spacing={2} align="stretch">
-                <Box display="flex" alignItems="center">
-                  <Icon as={FaUserPlus} color="green.500" mr={2} />
-                  <Text fontSize="sm">Tạo và quản lý bài viết của riêng bạn</Text>
-                </Box>
-                <Box display="flex" alignItems="center">
-                  <Icon as={FaLock} color="blue.500" mr={2} />
-                  <Text fontSize="sm">Đồng bộ dữ liệu an toàn với Google Drive</Text>
-                </Box>
-              </VStack>
+          <Divider />
+
+          {/* Login Options */}
+          <VStack spacing={4}>
+            <LoginButton
+              variant="google"
+              size="md"
+              width="200px"
+              useGoogleIcon={true}
+              onSuccess={onClose}
+              onError={(error) => console.error('Login error in modal:', error)}
+            />
+
+            <Button
+              variant="outline"
+              onClick={onClose}
+              size="sm"
+              w="full"
+              leftIcon={<FaSignInAlt />}
+            >
+              Quay lại
+            </Button>
+          </VStack>
+
+          {/* Benefits */}
+          <VStack spacing={3} align="stretch" pt={2}>
+            <Text fontSize="sm" fontWeight="medium">
+              Lợi ích khi đăng nhập:
+            </Text>
+            <VStack spacing={2} align="stretch">
+              <Box display="flex" alignItems="center">
+                <Icon as={FaUserPlus} color="green.500" mr={2} />
+                <Text fontSize="sm">Tạo và quản lý bài viết của riêng bạn</Text>
+              </Box>
+              <Box display="flex" alignItems="center">
+                <Icon as={FaLock} color="blue.500" mr={2} />
+                <Text fontSize="sm">Đồng bộ dữ liệu an toàn với Google Drive</Text>
+              </Box>
             </VStack>
           </VStack>
-        </ModalBody>
-      </ModalContent>
-    </Modal>
+        </VStack>
+      </ModalBody>
+    </AppModal>
   );
 };
 

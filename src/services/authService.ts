@@ -8,6 +8,7 @@ import {
   saveHistoryData,
   clearDataFromDB
 } from '../utils/indexedDBUtils';
+import { googleAuthService } from './auth/googleAuthService';
 
 // Types
 export interface UserInfo {
@@ -60,35 +61,40 @@ export class TokenManager {
       this.tokens = tokens;
       console.log('[TokenManager] Tokens stored in memory');
 
-      // 2. Try secure storage first, fallback to localStorage if needed
+      // 2. Try secure storage first
       try {
         const { secureStorage } = await import('../utils/secureStorage');
+        
+        // Ensure we have a valid encryption key
+        const key = await secureStorage.getOrCreateKey('auth', false);
+        if (!key) {
+          throw new Error('Failed to get/create encryption key');
+        }
+
+        // Store tokens in secure storage
         await secureStorage.setItem('auth_tokens', tokens, {
           keyName: 'auth',
-          sessionKey: false // Use persistent localStorage-based encryption key for persistent login
+          sessionKey: false
         });
         console.log('[TokenManager] Tokens stored in secure storage');
-      } catch (secureError) {
-        console.warn('[TokenManager] Secure storage failed, falling back to localStorage:', secureError);
 
-        // Fallback to localStorage (less secure but functional)
+        // Also store in localStorage as backup
         localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(tokens));
-        console.log('[TokenManager] Tokens stored in localStorage (fallback)');
+        console.log('[TokenManager] Tokens stored in localStorage (backup)');
+
+        return;
+      } catch (secureError) {
+        console.warn('[TokenManager] Secure storage failed:', secureError);
       }
 
-      console.log('[TokenManager] Tokens saved successfully');
+      // 3. Fallback to localStorage if secure storage fails
+      console.log('[TokenManager] Falling back to localStorage...');
+      localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(tokens));
+      console.log('[TokenManager] Tokens stored in localStorage (fallback)');
+
     } catch (error) {
       console.error('[TokenManager] Critical error saving tokens:', error);
-
-      // Last resort: try localStorage directly
-      try {
-        localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(tokens));
-        this.tokens = tokens;
-        console.log('[TokenManager] Tokens saved to localStorage as last resort');
-      } catch (lastResortError) {
-        console.error('[TokenManager] All storage methods failed:', lastResortError);
-        throw new Error('Failed to save authentication tokens');
-      }
+      throw new Error('Failed to save authentication tokens');
     }
   }
 
@@ -214,16 +220,18 @@ export class TokenManager {
     try {
       console.log('[TokenManager] Refreshing access token...');
 
+      const params = new URLSearchParams({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      });
+
       const response = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: new URLSearchParams({
-          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-          refresh_token: refreshToken,
-          grant_type: 'refresh_token',
-        }),
+        body: params,
       });
 
       if (!response.ok) {
@@ -327,71 +335,60 @@ export class AuthService {
 
   async login(accessToken: string): Promise<UserData> {
     try {
-      console.log('=== Starting AuthService Login ===');
-      console.log('Access token provided:', accessToken ? 'Yes' : 'No');
+      console.log('[AuthService] Starting login process...');
 
-      // Get user info from Google
-      console.log('Step 1: Getting user info from Google...');
+      // 1. Get user info from Google
       const userInfo = await this.getUserInfo(accessToken);
-      console.log('Step 1 completed: User info received');
+      console.log('[AuthService] Got user info:', userInfo.email);
 
-      // Save tokens with expiry (1 hour default for Google OAuth)
-      console.log('Step 2: Saving tokens...');
+      // 2. Save tokens first
       await this.tokenManager.saveTokens({
         accessToken,
-        expiresAt: Date.now() + (3600 * 1000) // 1 hour expiry
+        expiresAt: Date.now() + (3600 * 1000), // 1 hour from now
       });
-      console.log('Step 2 completed: Tokens saved with 1 hour expiry');
+      console.log('[AuthService] Tokens saved successfully');
 
-      // Get existing user data (no more guest data merging)
-      const existingUserData = await getUserData(userInfo.sub);
-      const existingFollows = existingUserData ? await getHistoryData('follows', userInfo.sub) : null;
-      const existingBookmarks = existingUserData ? await getHistoryData('bookmarks', userInfo.sub) : null;
-
-      // Ensure arrays
-      const mergedFollows = Array.isArray(existingFollows) ? existingFollows : [];
-      const mergedBookmarks = Array.isArray(existingBookmarks) ? existingBookmarks : [];
-
-      // Create user data
+      // 3. Create user data with valid key
       const userData: UserData = {
+        ...userInfo,
         id: userInfo.sub,
-        sub: userInfo.sub,
-        email: userInfo.email,
-        name: userInfo.name,
-        given_name: userInfo.given_name,
-        family_name: userInfo.family_name,
-        picture: userInfo.picture,
-        email_verified: userInfo.email_verified,
-
         timestamp: Date.now(),
-        lastSyncTime: Date.now(),
+        lastSyncTime: 0,
         syncStatus: {
-          totalFollows: mergedFollows.length,
-          totalBookmarks: mergedBookmarks.length
-        }
+          totalFollows: 0,
+          totalBookmarks: 0,
+        },
       };
 
-      // Save user data and history
+      // 4. Save user data with explicit key
       await saveUserData(userInfo.sub, userData);
-      await saveHistoryData('follows', userInfo.sub, mergedFollows);
-      await saveHistoryData('bookmarks', userInfo.sub, mergedBookmarks);
-
-      // No guest data to clear anymore
+      console.log('[AuthService] User data saved successfully');
 
       return userData;
     } catch (error) {
-      console.error('Login error:', error);
-      await this.tokenManager.clearTokens();
+      console.error('[AuthService] Login failed:', error);
       throw error;
     }
   }
 
   async logout(userId?: string): Promise<void> {
     try {
-      // Clear tokens first
+      console.log('[AuthService] Starting logout process...');
+
+      // 1. Clear tokens from all storage locations
       await this.tokenManager.clearTokens();
 
-      // Clear user data if userId provided
+      // 2. Clear user data from all storage locations
+      localStorage.removeItem(USER_STORAGE_KEY);
+      try {
+        const { secureStorage } = await import('../utils/secureStorage');
+        await secureStorage.removeItem('user_data');
+        await secureStorage.clearAllKeys();
+      } catch (secureError) {
+        console.warn('[AuthService] Secure storage clear failed:', secureError);
+      }
+
+      // 3. Clear user data from database if userId provided
       if (userId) {
         await deleteUserData(userId);
         await clearDataFromDB('follows', userId);
@@ -399,9 +396,19 @@ export class AuthService {
         await clearDataFromDB('reads', userId);
       }
 
-      // No guest data to clear anymore
+      // 4. Clear any cached user data in memory
+      this.currentUserPromise = null;
+
+      // 5. Clear any Google OAuth state
+      try {
+        await googleAuthService.logout();
+      } catch (googleError) {
+        console.warn('[AuthService] Google logout failed:', googleError);
+      }
+
+      console.log('[AuthService] Logout completed successfully');
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('[AuthService] Logout error:', error);
       throw error;
     }
   }
@@ -492,6 +499,8 @@ export class AuthService {
 
   async loginWithGoogle(): Promise<boolean> {
     try {
+      console.log('[AuthService] Starting Google login...');
+
       const response = await fetch('/api/auth/google', {
         method: 'POST',
         headers: {
@@ -500,19 +509,49 @@ export class AuthService {
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[AuthService] Google login failed:', response.status, errorText);
         throw new Error('Lỗi kết nối với Google');
       }
 
       const data = await response.json();
-      await this.tokenManager.saveTokens({
+      console.log('[AuthService] Google login response:', {
+        hasAccessToken: !!data.access_token,
+        hasRefreshToken: !!data.refresh_token,
+        expiresIn: data.expires_in
+      });
+
+      // Save tokens with proper expiry
+      const tokens: AuthTokens = {
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
         expiresAt: Date.now() + (data.expires_in * 1000)
-      });
+      };
+
+      console.log('[AuthService] Saving tokens...');
+      await this.tokenManager.saveTokens(tokens);
+      console.log('[AuthService] Tokens saved successfully');
+
+      // Get user info and save user data
+      const userInfo = await this.getUserInfo(data.access_token);
+      const userData: UserData = {
+        ...userInfo,
+        id: userInfo.sub,
+        timestamp: Date.now(),
+        lastSyncTime: 0,
+        syncStatus: {
+          totalFollows: 0,
+          totalBookmarks: 0,
+        },
+      };
+
+      console.log('[AuthService] Saving user data...');
+      await saveUserData(userInfo.sub, userData);
+      console.log('[AuthService] User data saved successfully');
 
       return true;
     } catch (error) {
-      console.error('Google login error:', error);
+      console.error('[AuthService] Google login error:', error);
       throw error;
     }
   }

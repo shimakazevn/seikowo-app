@@ -21,12 +21,17 @@ import {
   ModalBody,
   ModalCloseButton,
   Spacer,
+  Alert,
+  AlertIcon,
+  AlertTitle,
+  AlertDescription,
 } from '@chakra-ui/react';
 import { FaClock, FaTrash, FaExternalLinkAlt } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 import useFavoriteBookmarkStore from '../../../store/useFollowBookmarkStore';
 import useUserStore from '../../../store/useUserStore';
 import type { FavoritePost } from '../../../types/global';
+import { AppModal } from '../../common/AppModal';
 
 // Helper function to normalize timestamp
 const normalizeTimestamp = (post: FavoritePost): number => {
@@ -43,7 +48,7 @@ const normalizeTimestamp = (post: FavoritePost): number => {
 };
 
 interface FavoritePostsTabProps {
-  favoritesPosts: FavoritePost[];
+  favoritesPosts?: FavoritePost[];
   cardBg: string;
   textColor: string;
   mutedColor: string;
@@ -64,6 +69,7 @@ const FavoritePostsTab: React.FC<FavoritePostsTabProps> = ({
   const { removeFavorite } = useFavoriteBookmarkStore();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [selectedPost, setSelectedPost] = React.useState<FavoritePost | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
   const handleRemoveClick = (post: FavoritePost) => {
     setSelectedPost(post);
@@ -71,23 +77,42 @@ const FavoritePostsTab: React.FC<FavoritePostsTabProps> = ({
   };
 
   const handleConfirmRemove = async () => {
-    if (!selectedPost || !userId) return;
+    if (!selectedPost || !userId) {
+      setError('Vui lòng đăng nhập để xóa bài viết khỏi danh sách yêu thích');
+      return;
+    }
     
-    const success = await removeFavorite(selectedPost.id, userId, toast);
-    if (success) {
-      onClose();
+    try {
+      const success = await removeFavorite(selectedPost.id, userId, toast);
+      if (success) {
+        onClose();
+        setError(null);
+      }
+    } catch (err) {
+      console.error('Error removing favorite:', err);
+      setError('Không thể xóa bài viết khỏi danh sách yêu thích');
     }
   };
 
+  if (error) {
+    return (
+      <Alert status="error">
+        <AlertIcon />
+        <AlertTitle mr={2}>Lỗi!</AlertTitle>
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
+  }
+
   return (
     <Box>
-      {favoritesPosts.length === 0 ? (
+      {favoritesPosts?.length === 0 ? (
         <Text color={mutedColor} textAlign="center" py={10}>
           Bạn chưa yêu thích bài viết nào.
         </Text>
       ) : (
         <VStack spacing={0} align="stretch">
-          {favoritesPosts.map((post) => (
+          {favoritesPosts?.map((post: FavoritePost) => (
             <Box 
               key={post.id} 
               p={2} 
@@ -159,7 +184,7 @@ const FavoritePostsTab: React.FC<FavoritePostsTabProps> = ({
       )}
 
       {/* Confirmation Modal */}
-      <Modal isOpen={isOpen} onClose={onClose}>
+      <Modal isOpen={isOpen} onClose={onClose} isCentered>
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>Xác nhận xóa</ModalHeader>

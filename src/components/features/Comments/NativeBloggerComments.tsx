@@ -722,15 +722,6 @@ const NativeBloggerComments: React.FC<NativeBloggerCommentsProps> = ({
             <Button
               size="xs"
               variant="outline"
-              onClick={() => {
-                console.log('🔍 Debug info:');
-                console.log('- cleanPostId:', cleanPostId);
-                console.log('- blogId:', blogId);
-                console.log('- comments:', comments);
-                console.log('- isLoading:', isLoading);
-                console.log('- hasMore:', hasMore);
-                console.log('- Feed URL would be:', `https://seikowo-app.blogspot.com/feeds/comments/default?postId=${cleanPostId}&max-results=500`);
-              }}
               color={mutedColor}
             >
               Debug Info
@@ -770,7 +761,7 @@ const NativeBloggerComments: React.FC<NativeBloggerCommentsProps> = ({
       </VStack>
 
       {/* Inline Comment Form */}
-      <Box mt={6} data-testid="comment-form">
+      <Box data-testid="comment-form">
         <Text fontSize="md" fontWeight="medium" color={textColor} mb={4}>
           {replyingTo ? `Replying to comment ${replyingTo}` : 'Add a comment'}
         </Text>

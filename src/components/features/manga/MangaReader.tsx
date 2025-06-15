@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { LazyLoadImage } from 'react-lazy-load-image-component';
-import 'react-lazy-load-image-component/src/effects/opacity.css';
+import { Box, useColorModeValue } from '@chakra-ui/react';
+import LazyImage from '../../ui/common/LazyImage';
 import {
-  Box,
   Grid,
   Button,
   Modal,
@@ -16,7 +15,6 @@ import {
   HStack,
   Text,
   VStack,
-  useColorModeValue,
   useBreakpointValue,
   Flex,
   Switch,
@@ -61,18 +59,19 @@ import {
   ExternalLinkIcon,
 } from '@chakra-ui/icons';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { getHistoryData, saveHistoryData } from '../utils/indexedDBUtils';
-import { optimizeThumbnail } from '../utils/blogUtils';
+import { getHistoryData, saveHistoryData } from '../../../utils/indexedDBUtils';
+import { optimizeThumbnail } from '../../../utils/blogUtils';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
-import useUserStore from '../store/useUserStore';
-import { MANGA_KEY } from '../utils/userUtils';
-import { backupUserData } from '../api/auth';
+import useUserStore from '../../../store/useUserStore';
+import { MANGA_KEY } from '../../../utils/userUtils';
+import { backupUserData } from '../../../api/auth';
 import { debounce } from 'lodash';
-import useFollowBookmarkStore from '../store/useFollowBookmarkStore';
-import { MangaPost, User } from '../types/common';
-import { MangaBookmark } from '../types/global';
-import BookmarkButton from './BookmarkButton';
+import useFollowBookmarkStore from '../../../store/useFollowBookmarkStore';
+import { MangaPost } from '../../../types/common';
+import { MangaBookmark } from '../../../types/global';
+import { BookmarkButton } from '../../../ui/atoms/BookmarkButton';
+import { AppModal } from '../../common/AppModal';
 
 interface MangaReaderProps {
   postId: string;
@@ -414,7 +413,7 @@ const MangaReader: React.FC<MangaReaderProps> = ({
               favoritePosts: userId ? await getHistoryData('favorites', userId) : [],
               mangaBookmarks: userId ? await getHistoryData('bookmarks', userId) : []
             };
-            await backupUserData(accessToken, userId, backupData);
+            await backupUserData(userId, backupData);
           } catch (error: any) {
             console.error('Error backing up to Google Drive:', error);
           }
@@ -434,8 +433,6 @@ const MangaReader: React.FC<MangaReaderProps> = ({
       debouncedSave.cancel();
     };
   }, [currentPage, debouncedSave, isAuthenticated, userId, images]);
-
-
 
   const renderImage = useCallback((img: string, index: number, fill = false) => (
     <Box
@@ -496,18 +493,18 @@ const MangaReader: React.FC<MangaReaderProps> = ({
               maxHeight: fill ? '100%' : (isVerticalMode ? 'none' : '100%'),
             }}
           >
-            <img
+            <LazyImage
               src={getFullUrl(img)}
               alt={`Page ${index + 1}`}
-              style={{
-                width: fill ? '100%' : 'auto',
-                height: fill ? '100%' : (isVerticalMode ? 'auto' : '100%'),
-                objectFit: 'contain',
-                userSelect: 'none',
-                WebkitUserSelect: 'none',
+              width="100%"
+              height="100%"
+              objectFit="contain"
+              onClick={() => {
+                setCurrentPage(index);
+                onOpen();
               }}
-              loading="lazy"
-              onDoubleClick={() => resetTransform()}
+              onError={handleImageError}
+              threshold={800}
             />
           </TransformComponent>
         )}
@@ -745,16 +742,13 @@ const MangaReader: React.FC<MangaReaderProps> = ({
                 transition: 'transform 0.2s'
               }}
             >
-              <LazyLoadImage
+              <LazyImage
                 src={getThumbUrl(img)}
                 alt={`Page ${idx + 1}`}
-                effect="opacity"
-                style={{
-                  width: '100%',
-                  height: 'auto',
-                  borderRadius: 'md',
-                  objectFit: 'cover'
-                }}
+                width="100%"
+                height="100%"
+                objectFit="contain"
+                threshold={800}
               />
               <Text
                 position="absolute"
@@ -773,280 +767,139 @@ const MangaReader: React.FC<MangaReaderProps> = ({
           ))}
         </Grid>
 
-        <Modal
+        <AppModal
           isOpen={isOpen}
           onClose={handleClose}
           size="full"
           motionPreset="slideInBottom"
+          contentMaxW="100vw"
+          contentMaxH="100vh"
+          contentM={0}
+          contentP={0}
+          contentBorderRadius={0}
+          contentBorder="none"
         >
-          <ModalOverlay />
-          <ModalContent
-            bg={bgColor}
-            maxW="100vw"
-            maxH="100vh"
-            m={0}
-            p={0}
-            borderRadius={0}
+          <ModalHeader
+            p={4}
+            display="flex"
+            justifyContent="space-between"
+            alignItems="center"
+            borderBottom="1px"
+            borderColor="gray.200"
           >
-            <ModalHeader
-              p={4}
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-              borderBottom="1px"
-              borderColor="gray.200"
-            >
-              <Text fontSize="lg" fontWeight="bold" noOfLines={1}>
-                {postTitle}
-              </Text>
-              <HStack spacing={2}>
-                <IconButton
-                  aria-label="Toggle toolbar"
-                  icon={showToolbar ? <ViewOffIcon /> : <ViewOnIcon />}
-                  onClick={handleToolbarToggle}
-                  variant="ghost"
-                  size="sm"
-                />
-                <IconButton
-                  aria-label="Settings"
-                  icon={<SettingsIcon />}
-                  onClick={onSettingsOpen}
-                  variant="ghost"
-                  size="sm"
-                />
-                <IconButton
-                  aria-label="Close"
-                  icon={<ChevronDownIcon />}
-                  onClick={handleClose}
-                  variant="ghost"
-                  size="sm"
-                />
-              </HStack>
-            </ModalHeader>
+            <Text fontSize="lg" fontWeight="bold" noOfLines={1}>
+              {postTitle}
+            </Text>
+            <HStack spacing={2}>
+              <IconButton
+                aria-label="Toggle toolbar"
+                icon={showToolbar ? <ViewOffIcon /> : <ViewOnIcon />}
+                onClick={handleToolbarToggle}
+                variant="ghost"
+                size="sm"
+              />
+              <IconButton
+                aria-label="Settings"
+                icon={<SettingsIcon />}
+                onClick={onSettingsOpen}
+                variant="ghost"
+                size="sm"
+              />
+              <IconButton
+                aria-label="Close"
+                icon={<ChevronDownIcon />}
+                onClick={handleClose}
+                variant="ghost"
+                size="sm"
+              />
+            </HStack>
+          </ModalHeader>
 
-            <ModalBody
-              ref={modalBodyRef}
-              p={0}
-              overflow={isVerticalMode ? 'auto' : 'hidden'}
-              position="relative"
-              onScroll={handleScroll}
-              onTouchStart={onTouchStart}
-              onTouchMove={onTouchMove}
-              onTouchEnd={onTouchEnd}
-            >
-              {loading && (
-                <Flex
-                  position="absolute"
-                  top={0}
-                  left={0}
-                  right={0}
-                  bottom={0}
-                  justify="center"
-                  align="center"
-                  bg="blackAlpha.700"
-                  zIndex={10}
-                >
-                  <Spinner size="xl" color="white" />
-                </Flex>
-              )}
-
-              {isVerticalMode ? (
-                <VStack spacing={0} align="stretch">
-                  {images.map((img, idx) => renderImage(img, idx, true))}
-                </VStack>
-              ) : (
-                <Box
-                  position="relative"
-                  width="100%"
-                  height="100%"
-                  display="flex"
-                  justifyContent="center"
-                  alignItems="center"
-                >
-                  {isTwoPage ? (
-                    <HStack spacing={0} width="100%" height="100%">
-                      {currentPage < images.length && renderImage(images[currentPage], currentPage)}
-                      {currentPage + 1 < images.length && renderImage(images[currentPage + 1], currentPage + 1)}
-                    </HStack>
-                  ) : (
-                    renderImage(images[currentPage], currentPage)
-                  )}
-                </Box>
-              )}
-            </ModalBody>
-
-            {showToolbar && (
-              <Box
+          <ModalBody
+            ref={modalBodyRef}
+            p={0}
+            overflow={isVerticalMode ? 'auto' : 'hidden'}
+            position="relative"
+            onScroll={handleScroll}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+          >
+            {loading && (
+              <Flex
                 position="absolute"
-                bottom={0}
+                top={0}
                 left={0}
                 right={0}
-                p={4}
-                bg={bgColor}
-                borderTop="1px"
-                borderColor="gray.200"
-                zIndex={5}
+                bottom={0}
+                justify="center"
+                align="center"
+                bg="blackAlpha.700"
+                zIndex={10}
               >
-                <HStack spacing={4} justify="space-between">
-                  <HStack spacing={2}>
-                    <IconButton
-                      aria-label="Previous page"
-                      icon={<ChevronLeftIcon />}
-                      onClick={handlePrevPage}
-                      isDisabled={currentPage === 0}
-                      variant="ghost"
-                      size="sm"
-                    />
-                    <NumberInput
-                      value={currentPage + 1}
-                      min={1}
-                      max={images.length}
-                      onChange={handlePageJump}
-                      size="sm"
-                      width="70px"
-                    >
-                      <NumberInputField />
-                      <NumberInputStepper>
-                        <NumberIncrementStepper />
-                        <NumberDecrementStepper />
-                      </NumberInputStepper>
-                    </NumberInput>
-                    <Text color={mutedTextColor}>/ {images.length}</Text>
-                    <IconButton
-                      aria-label="Next page"
-                      icon={<ChevronRightIcon />}
-                      onClick={handleNextPage}
-                      isDisabled={currentPage === images.length - 1}
-                      variant="ghost"
-                      size="sm"
-                    />
-                  </HStack>
+                <Spinner size="xl" color="white" />
+              </Flex>
+            )}
 
-                  <HStack spacing={2}>
-                    <Tooltip label="Vertical mode">
-                      <Switch
-                        isChecked={isVerticalMode}
-                        onChange={handleModeSwitch}
-                        size="sm"
-                      />
-                    </Tooltip>
-                    <Tooltip label="Two-page mode">
-                      <Switch
-                        isChecked={isTwoPage}
-                        onChange={handleTwoPageSwitch}
-                        isDisabled={isVerticalMode}
-                        size="sm"
-                      />
-                    </Tooltip>
-                    <Tooltip label="Auto-scroll">
-                      <Switch
-                        isChecked={autoScroll}
-                        onChange={handleAutoScrollToggle}
-                        isDisabled={!isVerticalMode}
-                        size="sm"
-                      />
-                    </Tooltip>
-                    {autoScroll && (
-                      <Slider
-                        value={autoScrollSpeed}
-                        onChange={handleAutoScrollSpeedChange}
-                        min={1}
-                        max={10}
-                        step={1}
-                        width="100px"
-                        size="sm"
-                      >
-                        <SliderTrack>
-                          <SliderFilledTrack />
-                        </SliderTrack>
-                        <SliderThumb />
-                      </Slider>
-                    )}
-                    <Tooltip label="Brightness">
-                      <Slider
-                        value={brightness}
-                        onChange={handleBrightnessChange}
-                        min={50}
-                        max={150}
-                        step={1}
-                        width="100px"
-                        size="sm"
-                      >
-                        <SliderTrack>
-                          <SliderFilledTrack />
-                        </SliderTrack>
-                        <SliderThumb />
-                      </Slider>
-                    </Tooltip>
-                    <BookmarkButton
-                      mangaData={{
-                        id: postId,
-                        title: postTitle,
-                        url: window.location.pathname,
-                        currentPage,
-                        totalPages: images.length,
-                        verticalMode: isVerticalMode
-                      }}
-                    />
-                    <IconButton
-                      aria-label="Download"
-                      icon={<DownloadIcon />}
-                      onClick={() => handleDownload(currentPage)}
-                      variant="ghost"
-                      size="sm"
-                      isLoading={isDownloading}
-                    />
-                    <IconButton
-                      aria-label="Share"
-                      icon={<ExternalLinkIcon />}
-                      onClick={handleShare}
-                      variant="ghost"
-                      size="sm"
-                    />
-                    <IconButton
-                      aria-label="Fullscreen"
-                      icon={fullscreen ? <ViewOffIcon /> : <ViewIcon />}
-                      onClick={handleFullscreen}
-                      variant="ghost"
-                      size="sm"
-                    />
+            {isVerticalMode ? (
+              <VStack spacing={0} align="stretch">
+                {images.map((img, idx) => renderImage(img, idx, true))}
+              </VStack>
+            ) : (
+              <Box
+                position="relative"
+                width="100%"
+                height="100%"
+                display="flex"
+                justifyContent="center"
+                alignItems="center"
+              >
+                {isTwoPage ? (
+                  <HStack spacing={0} width="100%" height="100%">
+                    {currentPage < images.length && renderImage(images[currentPage], currentPage)}
+                    {currentPage + 1 < images.length && renderImage(images[currentPage + 1], currentPage + 1)}
                   </HStack>
-                </HStack>
+                ) : (
+                  renderImage(images[currentPage], currentPage)
+                )}
               </Box>
             )}
-          </ModalContent>
-        </Modal>
+          </ModalBody>
+        </AppModal>
 
-        <Modal
+        <AppModal
           isOpen={isSettingsOpen}
           onClose={onSettingsClose}
           size="md"
+          isCentered
+          contentMaxW="md"
+          contentP={6}
+          contentBorderRadius="xl"
+          contentBoxShadow="xl"
+          contentBorder="none"
         >
-          <ModalOverlay />
-          <ModalContent>
-            <ModalHeader>Settings</ModalHeader>
-            <ModalCloseButton />
-            <ModalBody pb={6}>
-              <VStack spacing={4} align="stretch">
-                <Box>
-                  <Text mb={2}>Display Count</Text>
-                  <NumberInput
-                    value={displayCount}
-                    min={4}
-                    max={24}
-                    onChange={(_, value) => setDisplayCount(value)}
-                  >
-                    <NumberInputField />
-                    <NumberInputStepper>
-                      <NumberIncrementStepper />
-                      <NumberDecrementStepper />
-                    </NumberInputStepper>
-                  </NumberInput>
-                </Box>
-              </VStack>
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+          <ModalHeader>Settings</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody pb={6}>
+            <VStack spacing={4} align="stretch">
+              <Box>
+                <Text mb={2}>Display Count</Text>
+                <NumberInput
+                  value={displayCount}
+                  min={4}
+                  max={24}
+                  onChange={(_, value) => setDisplayCount(value)}
+                >
+                  <NumberInputField />
+                  <NumberInputStepper>
+                    <NumberIncrementStepper />
+                    <NumberDecrementStepper />
+                  </NumberInputStepper>
+                </NumberInput>
+              </Box>
+            </VStack>
+          </ModalBody>
+        </AppModal>
       </VStack>
     </Box>
   );

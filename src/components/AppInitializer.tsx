@@ -13,7 +13,6 @@ const AppInitializer: React.FC<AppInitializerProps> = ({ children }) => {
   const progress = Object.values(initializationProgress).filter(Boolean).length / 3 * 100;
   
   // Colors
-  const bgColor = useColorModeValue('white', 'gray.800');
   const textColor = useColorModeValue('gray.600', 'gray.400');
   const errorColor = useColorModeValue('red.500', 'red.300');
 
@@ -28,8 +27,8 @@ const AppInitializer: React.FC<AppInitializerProps> = ({ children }) => {
   // Show loading screen while initializing
   if (!isInitialized || isInitializing) {
     return (
-      <Center minH="100vh" bg={bgColor}>
-        <VStack spacing={6} p={8} borderRadius="lg" boxShadow="lg" bg={bgColor}>
+      <Center minH="100vh" >
+        <VStack spacing={6} p={8} borderRadius="lg" >
           <Spinner
             size="xl"
             color="blue.500"

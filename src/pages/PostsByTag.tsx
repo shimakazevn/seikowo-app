@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { blogConfig } from '../config';
 import { fetchPostsByTag } from '../api';
+import LazyImage from '../components/ui/common/LazyImage';
 
 interface Post {
   id: string;
@@ -64,7 +65,14 @@ const PostsByTag: React.FC = () => {
             <div className="col" key={post.id}>
               <Link to={`/${slugPath}`} className="text-decoration-none text-dark">
                 <div className="card h-100 shadow-sm">
-                  <img src={thumb} className="card-img-top" alt={post.title} style={{ height: 300, objectFit: 'cover' }} />
+                  <LazyImage
+                    src={thumb}
+                    alt={post.title}
+                    width="100%"
+                    height="300px"
+                    objectFit="cover"
+                    borderRadius="md"
+                  />
                   <div className="card-body">
                     <h5 className="card-title text-truncate">{post.title}</h5>
                     <p className="card-text"><small className="text-muted">{date.toLocaleDateString()} </small></p>
